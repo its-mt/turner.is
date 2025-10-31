@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>turner.is</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Color scheme variables - easy to change */
+            /* Main palette */
+            --caribbean-current: #16697a;
+            --moonstone: #489fb5;
+            --sky-blue: #82c0cc;
+            --isabelline: #ede7e3;
+            --orange-peel: #ffa62b;
+
+            /* Active colors */
+            --primary-color: var(--caribbean-current);
+            --secondary-color: var(--moonstone);
+            --text-color: var(--isabelline);
+            --accent-color: var(--orange-peel);
+
+            /* Particle colors (HSL values for dynamic color mixing) */
+            --particle-hue-base: 190;
+            --particle-saturation: 42;
+            --particle-lightness: 65;
+
+            /* Effects */
+            --blur-amount: 2px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            position: relative;
+        }
+
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            filter: blur(var(--blur-amount));
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .content {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        h1 {
+            font-size: clamp(3rem, 10vw, 8rem);
+            font-weight: 700;
+            color: var(--text-color);
+            letter-spacing: -0.02em;
+            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="content">
+        <h1>turner.is</h1>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas to full window size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Particle class
+        class Particle {
+            constructor(x, y, vx = 0, vy = 0) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.radius = 4;
+                this.density = 0;
+                this.pressure = 0;
+                this.age = 0;
+            }
+
+            update() {
+                // Increment age
+                this.age++;
+
+                // Apply gravity (disabled)
+                // this.vy += 0.3;
+
+                // Apply velocity
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Boundary collisions with damping
+                if (this.x - this.radius < 0) {
+                    this.x = this.radius;
+                    this.vx *= -0.5;
+                } else if (this.x + this.radius > canvas.width) {
+                    this.x = canvas.width - this.radius;
+                    this.vx *= -0.5;
+                }
+
+                if (this.y - this.radius < 0) {
+                    this.y = this.radius;
+                    this.vy *= -0.5;
+                } else if (this.y + this.radius > canvas.height) {
+                    this.y = canvas.height - this.radius;
+                    this.vy *= -0.5;
+                    // Ground friction
+                    this.vx *= 0.95;
+                }
+
+                // Air resistance
+                this.vx *= 0.99;
+                this.vy *= 0.99;
+            }
+
+            draw() {
+                // Color based on velocity (speed)
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                const hue = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--particle-hue-base')) + Math.min(speed * 5, 60);
+                const saturation = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--particle-saturation')) + Math.min(speed * 3, 30);
+                const lightness = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--particle-lightness'));
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`;
+                ctx.fill();
+
+                // Add a highlight
+                ctx.beginPath();
+                ctx.arc(this.x - 1, this.y - 1, this.radius * 0.4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.fill();
+            }
+        }
+
+        // Simulation state
+        let particles = [];
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let lastMouseX = mouseX;
+        let lastMouseY = mouseY;
+
+        // Physics constants
+        const SMOOTHING_RADIUS = 30;
+        const TARGET_DENSITY = 2;
+        const PRESSURE_MULTIPLIER = 50;
+        const MAX_PARTICLES = 800; // Lower limit for better performance
+        const PARTICLE_SPAWN_RATE = 2; // Particles per frame when cursor moves
+
+        // Calculate density for all particles
+        function calculateDensities() {
+            for (let i = 0; i < particles.length; i++) {
+                let density = 0;
+                const p1 = particles[i];
+
+                for (let j = 0; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < SMOOTHING_RADIUS) {
+                        const influence = 1 - (dist / SMOOTHING_RADIUS);
+                        density += influence * influence;
+                    }
+                }
+
+                p1.density = density;
+                p1.pressure = (density - TARGET_DENSITY) * PRESSURE_MULTIPLIER;
+            }
+        }
+
+        // Apply pressure forces
+        function applyPressureForces() {
+            for (let i = 0; i < particles.length; i++) {
+                const p1 = particles[i];
+                let pressureX = 0;
+                let pressureY = 0;
+
+                for (let j = 0; j < particles.length; j++) {
+                    if (i === j) continue;
+
+                    const p2 = particles[j];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < SMOOTHING_RADIUS && dist > 0) {
+                        const influence = 1 - (dist / SMOOTHING_RADIUS);
+                        const pressure = (p1.pressure + p2.pressure) / 2;
+                        const forceX = (dx / dist) * pressure * influence;
+                        const forceY = (dy / dist) * pressure * influence;
+
+                        pressureX += forceX;
+                        pressureY += forceY;
+                    }
+                }
+
+                p1.vx -= pressureX * 0.01;
+                p1.vy -= pressureY * 0.01;
+            }
+        }
+
+        // Apply viscosity (makes fluid stick together)
+        function applyViscosity() {
+            const viscosity = 0.05;
+
+            for (let i = 0; i < particles.length; i++) {
+                const p1 = particles[i];
+
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < SMOOTHING_RADIUS && dist > 0) {
+                        const influence = 1 - (dist / SMOOTHING_RADIUS);
+                        const dvx = p2.vx - p1.vx;
+                        const dvy = p2.vy - p1.vy;
+
+                        p1.vx += dvx * viscosity * influence;
+                        p1.vy += dvy * viscosity * influence;
+                        p2.vx -= dvx * viscosity * influence;
+                        p2.vy -= dvy * viscosity * influence;
+                    }
+                }
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            // Clear with semi-transparent background for trail effect
+            ctx.fillStyle = `${getComputedStyle(document.documentElement).getPropertyValue('--primary-color')}10`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Calculate mouse movement
+            const mouseDx = mouseX - lastMouseX;
+            const mouseDy = mouseY - lastMouseY;
+            const mouseSpeed = Math.sqrt(mouseDx * mouseDx + mouseDy * mouseDy);
+
+            // Automatically spawn particles following cursor
+            if (mouseSpeed > 0.5) {
+                for (let i = 0; i < PARTICLE_SPAWN_RATE; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const spread = 8;
+                    const px = mouseX + Math.cos(angle) * spread;
+                    const py = mouseY + Math.sin(angle) * spread;
+                    particles.push(new Particle(px, py, mouseDx * 0.3, mouseDy * 0.3));
+                }
+            }
+
+            // Remove oldest particles if we exceed MAX_PARTICLES
+            while (particles.length > MAX_PARTICLES) {
+                particles.shift(); // Remove oldest particle (from beginning of array)
+            }
+
+            lastMouseX = mouseX;
+            lastMouseY = mouseY;
+
+            // Physics simulation
+            calculateDensities();
+            applyPressureForces();
+            applyViscosity();
+
+            // Update and draw particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Track mouse position across entire window
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        // Touch events for mobile
+        window.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            mouseX = touch.clientX;
+            mouseY = touch.clientY;
+        }, { passive: false });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
