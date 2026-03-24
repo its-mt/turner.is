@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loft Conversion Planner</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 260px;
+  background: #242424;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 14px 16px;
+  border-bottom: 1px solid #333;
+  color: #fff;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.copy-link-btn {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 4px 8px;
+  background: #2e2e2e;
+  border: 1px solid #3a3a3a;
+  color: #888;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+.copy-link-btn:hover { background: #363636; color: #ccc; }
+.copy-link-btn.copied { border-color: #3a6a3a; color: #6dbe6d; }
+.section {
+  padding: 10px 14px;
+  border-bottom: 1px solid #333;
+}
+.section h2 {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #666;
+  margin-bottom: 8px;
+}
+.field { margin-bottom: 8px; }
+.field label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 3px;
+}
+.field label span { color: #e0e0e0; font-variant-numeric: tabular-nums; }
+.field input[type=range] { width: 100%; accent-color: #4a9eff; cursor: pointer; }
+
+/* ── Tools ── */
+.tools {
+  display: flex;
+  gap: 5px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #333;
+}
+.tool-btn {
+  flex: 1;
+  padding: 7px 2px;
+  background: #2e2e2e;
+  border: 1px solid #3a3a3a;
+  color: #aaa;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: center;
+  transition: background 0.1s, color 0.1s;
+  user-select: none;
+}
+.tool-btn:hover { background: #363636; color: #ddd; }
+.tool-btn.active { background: #1a3a6a; border-color: #4a9eff; color: #fff; }
+
+/* ── Info panel ── */
+.info-panel {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.6;
+  flex: 1;
+}
+.info-panel strong { color: #ddd; }
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid #2a2a2a;
+}
+.metric-row:last-child { border-bottom: none; }
+.metric-label { color: #888; }
+.metric-value { color: #e0e0e0; font-variant-numeric: tabular-nums; font-weight: 500; }
+.metric-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.action-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 5px;
+  background: #2e2e2e;
+  border: 1px solid #3a3a3a;
+  color: #bbb;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+  transition: background 0.1s;
+}
+.action-btn:hover { background: #383838; color: #fff; }
+.action-btn.danger { border-color: #5a2a2a; color: #e07070; }
+.action-btn.danger:hover { background: #3a2020; }
+
+/* ── Main area ── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+.canvas-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#mainCanvas { display: block; }
+
+/* ── Cross-section ── */
+.cross-section {
+  height: 150px;
+  background: #1c1c1c;
+  border-top: 1px solid #333;
+  position: relative;
+  flex-shrink: 0;
+}
+#sectionCanvas { display: block; }
+.section-label {
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  font-size: 10px;
+  color: #555;
+  pointer-events: none;
+}
+.height-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 12px;
+  font-size: 11px;
+  color: #888;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-title">
+    Loft Conversion Planner
+    <button class="copy-link-btn" id="copyLinkBtn" onclick="copyLink()">⎘ Copy link</button>
+  </div>
+
+  <div class="section">
+    <h2>Floor Plan</h2>
+    <div class="field">
+      <label>Width (gable to gable) <span id="widthVal">6.0m</span></label>
+      <input type="range" id="ctrlWidth" min="2" max="15" step="0.5" value="6">
+    </div>
+    <div class="field">
+      <label>Length (along ridge) <span id="lengthVal">8.0m</span></label>
+      <input type="range" id="ctrlLength" min="2" max="20" step="0.5" value="8">
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Roof Profile</h2>
+    <div class="field">
+      <label>Ridge height <span id="ridgeHVal">2.5m</span></label>
+      <input type="range" id="ctrlRidgeH" min="1" max="5" step="0.1" value="2.5">
+    </div>
+    <div class="field">
+      <label>Eaves height <span id="eavesHVal">0.8m</span></label>
+      <input type="range" id="ctrlEavesH" min="0" max="2.5" step="0.1" value="0.8">
+    </div>
+    <div class="field">
+      <label>Ridge position <span id="ridgePosVal">Centre</span></label>
+      <input type="range" id="ctrlRidgePos" min="15" max="85" step="5" value="50">
+    </div>
+    <div class="field">
+      <label>Min standing height <span id="minHVal">1.9m</span></label>
+      <input type="range" id="ctrlMinH" min="1.2" max="2.4" step="0.1" value="1.9">
+    </div>
+    <div class="field">
+      <label>Min storage height <span id="storageHVal">0.9m</span></label>
+      <input type="range" id="ctrlStorageH" min="0.3" max="1.5" step="0.1" value="0.9">
+    </div>
+  </div>
+
+  <div class="section" id="metricsSection">
+    <h2>Conversion metrics</h2>
+    <div id="metricsContent"></div>
+  </div>
+
+  <div class="tools">
+    <button class="tool-btn active" id="btnSelect" onclick="setMode('select')">↖ Select</button>
+    <button class="tool-btn" id="btnWall" onclick="setMode('wall')">▬ Wall</button>
+    <button class="tool-btn" id="btnDormer" onclick="setMode('dormer')">⬜ Dormer</button>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <div id="infoContent"></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="canvas-area" id="canvasArea">
+    <canvas id="mainCanvas"></canvas>
+  </div>
+  <div class="cross-section" id="crossSection">
+    <canvas id="sectionCanvas"></canvas>
+    <span class="section-label">Cross-section — looking along ridge →</span>
+    <span class="height-badge" id="heightBadge"></span>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════
+const S = {
+  // Space
+  width: 6,
+  length: 8,
+  ridgeH: 2.5,
+  eavesH: 0.8,
+  ridgePosX: 0.5,   // 0..1 fraction of width
+  minH: 1.9,
+  storageH: 0.9,    // min height for low storage zone
+
+  // Geometry
+  walls: [],        // [{id, x1,y1,x2,y2, doors:[{id,pos,width,swing}]}]
+  dormers: [],      // [{id, x1,y1,x2,y2, height}]
+
+  // Interaction
+  mode: 'select',   // 'select' | 'wall' | 'dormer'
+  drawStart: null,  // [x,y] metres
+  mousePos: null,   // [x,y] metres, snapped
+  selectedId: null, // wallId (number) | 'door-<wid>-<did>' | 'dormer-<id>' (string)
+  dragging: null,   // {type:'door', wallId, doorId} while mousedown
+  hoverXm: null,    // raw X in metres for cross-section indicator
+  hoverYm: null,    // raw Y in metres
+
+  snapGrid: 0.25,
+  _nextId: 1,
+};
+
+function newId() { return S._nextId++; }
+
+// ═══════════════════════════════════════════════════════
+// Geometry helpers
+// ═══════════════════════════════════════════════════════
+function roofSlopeAt(x) {
+  const rx = S.ridgePosX * S.width;
+  const t = x <= rx
+    ? (rx > 0 ? x / rx : 0)
+    : (rx < S.width ? (S.width - x) / (S.width - rx) : 0);
+  return S.eavesH + (S.ridgeH - S.eavesH) * Math.max(0, Math.min(1, t));
+}
+
+function roofHeightAt(x, y) {
+  // Dormers override the slope height — height always tracks minH
+  if (y !== undefined) {
+    for (const d of S.dormers) {
+      const minX = Math.min(d.x1, d.x2), maxX = Math.max(d.x1, d.x2);
+      const minY = Math.min(d.y1, d.y2), maxY = Math.max(d.y1, d.y2);
+      if (x >= minX && x <= maxX && y >= minY && y <= maxY) return S.minH;
+    }
+  }
+  return roofSlopeAt(x);
+}
+
+function dormerRect(d) {
+  return [Math.min(d.x1,d.x2), Math.min(d.y1,d.y2), Math.max(d.x1,d.x2), Math.max(d.y1,d.y2)];
+}
+
+function heightZoneX(minHeight) {
+  // Returns [x1, x2] where roof slope is >= minHeight
+  if (S.ridgeH <= minHeight) return [S.ridgePosX * S.width, S.ridgePosX * S.width];
+  if (S.eavesH >= minHeight) return [0, S.width];
+  const frac = (minHeight - S.eavesH) / (S.ridgeH - S.eavesH);
+  const rx = S.ridgePosX * S.width;
+  return [Math.max(0, frac * rx), Math.min(S.width, S.width - frac * (S.width - rx))];
+}
+
+function usableZoneX() { return heightZoneX(S.minH); }
+function storageZoneX() { return heightZoneX(Math.min(S.storageH, S.minH - 0.01)); }
+
+function wallLen(w) {
+  const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function distToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+function snapPoint(mx, my) {
+  const g = S.snapGrid;
+  let x = Math.round(Math.max(0, Math.min(S.width, mx)) / g) * g;
+  let y = Math.round(Math.max(0, Math.min(S.length, my)) / g) * g;
+  // Snap to existing endpoints
+  for (const w of S.walls) {
+    for (const [ex, ey] of [[w.x1, w.y1], [w.x2, w.y2]]) {
+      if (Math.hypot(mx - ex, my - ey) < 0.35) { x = ex; y = ey; }
+    }
+  }
+  return [x, y];
+}
+
+// ═══════════════════════════════════════════════════════
+// Canvas setup
+// ═══════════════════════════════════════════════════════
+const mainCanvas = document.getElementById('mainCanvas');
+const ctx = mainCanvas.getContext('2d');
+const secCanvas = document.getElementById('sectionCanvas');
+const sctx = secCanvas.getContext('2d');
+const canvasArea = document.getElementById('canvasArea');
+const crossSection = document.getElementById('crossSection');
+
+let scale = 80;   // px per metre
+let offX = 60, offY = 50;
+
+function fitScale() {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  const margin = 100;
+  scale = Math.min((W - margin * 2) / S.width, (H - margin * 2) / S.length, 130);
+  offX = (W - S.width * scale) / 2;
+  offY = (H - S.length * scale) / 2;
+}
+
+function resizeAll() {
+  mainCanvas.width = canvasArea.clientWidth;
+  mainCanvas.height = canvasArea.clientHeight;
+  secCanvas.width = canvasArea.clientWidth;
+  secCanvas.height = crossSection.clientHeight;
+  fitScale();
+  render();
+}
+
+// metres → canvas
+function m2c(mx, my) { return [offX + mx * scale, offY + my * scale]; }
+// canvas → metres (raw, unsnapped)
+function c2m(cx, cy) { return [(cx - offX) / scale, (cy - offY) / scale]; }
+
+// ═══════════════════════════════════════════════════════
+// Rendering — main canvas
+// ═══════════════════════════════════════════════════════
+function computeMetrics() {
+  // Sample on a 0.1m grid — handles dormers and irregular shapes naturally
+  const step = 0.1;
+  const cellArea = step * step;
+  let standingArea = 0, storageArea = 0, volume = 0;
+
+  for (let x = step / 2; x < S.width; x += step) {
+    for (let y = step / 2; y < S.length; y += step) {
+      const h = roofHeightAt(x, y);
+      volume += h * cellArea;
+      if (h >= S.minH)          standingArea += cellArea;
+      else if (h >= S.storageH) storageArea  += cellArea;
+    }
+  }
+  return { standingArea, storageArea, volume };
+}
+
+function updateMetrics() {
+  const { standingArea, storageArea, volume } = computeMetrics();
+  document.getElementById('metricsContent').innerHTML = `
+    <div class="metric-row">
+      <span class="metric-label"><span class="metric-dot" style="background:rgba(74,158,255,0.5)"></span>Standing floor (≥${S.minH.toFixed(1)} m)</span>
+      <span class="metric-value">${standingArea.toFixed(1)} m²</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label"><span class="metric-dot" style="background:rgba(180,120,255,0.5)"></span>Eaves storage (${S.storageH.toFixed(1)}–${S.minH.toFixed(1)} m)</span>
+      <span class="metric-value">${storageArea.toFixed(1)} m²</span>
+    </div>
+    <div class="metric-row">
+      <span class="metric-label">Total cubic volume</span>
+      <span class="metric-value">${volume.toFixed(1)} m³</span>
+    </div>`;
+}
+
+function render() {
+  renderMain();
+  renderSection();
+  updateInfo();
+  updateMetrics();
+  saveToURL();
+}
+
+function renderMain() {
+  const W = mainCanvas.width, H = mainCanvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(0, 0, W, H);
+
+  const fw = S.width * scale, fh = S.length * scale;
+
+  // ── Grid ──
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= S.width + 0.001; x += 0.5) {
+    ctx.strokeStyle = Math.abs(x % 1) < 0.01 ? '#272727' : '#222';
+    ctx.beginPath();
+    ctx.moveTo(offX + x * scale, offY);
+    ctx.lineTo(offX + x * scale, offY + fh);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= S.length + 0.001; y += 0.5) {
+    ctx.strokeStyle = Math.abs(y % 1) < 0.01 ? '#272727' : '#222';
+    ctx.beginPath();
+    ctx.moveTo(offX, offY + y * scale);
+    ctx.lineTo(offX + fw, offY + y * scale);
+    ctx.stroke();
+  }
+
+  // ── Storage zone (between storageH and minH) ──
+  const [sx1, sx2] = storageZoneX();
+  const [ux1, ux2] = usableZoneX();
+  // Left storage band
+  if (sx1 < ux1) {
+    ctx.fillStyle = 'rgba(180,120,255,0.07)';
+    ctx.fillRect(offX + sx1 * scale, offY, (ux1 - sx1) * scale, fh);
+    ctx.strokeStyle = 'rgba(180,120,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    if (sx1 > 0.01) {
+      ctx.beginPath(); ctx.moveTo(offX + sx1 * scale, offY);
+      ctx.lineTo(offX + sx1 * scale, offY + fh); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  // Right storage band
+  if (sx2 > ux2) {
+    ctx.fillStyle = 'rgba(180,120,255,0.07)';
+    ctx.fillRect(offX + ux2 * scale, offY, (sx2 - ux2) * scale, fh);
+    ctx.strokeStyle = 'rgba(180,120,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    if (sx2 < S.width - 0.01) {
+      ctx.beginPath(); ctx.moveTo(offX + sx2 * scale, offY);
+      ctx.lineTo(offX + sx2 * scale, offY + fh); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  // ── Usable zone ──
+  if (ux2 > ux1) {
+    ctx.fillStyle = 'rgba(74,158,255,0.07)';
+    ctx.fillRect(offX + ux1 * scale, offY, (ux2 - ux1) * scale, fh);
+
+    ctx.strokeStyle = 'rgba(74,158,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    if (ux1 > 0.01) {
+      ctx.beginPath(); ctx.moveTo(offX + ux1 * scale, offY);
+      ctx.lineTo(offX + ux1 * scale, offY + fh); ctx.stroke();
+    }
+    if (ux2 < S.width - 0.01) {
+      ctx.beginPath(); ctx.moveTo(offX + ux2 * scale, offY);
+      ctx.lineTo(offX + ux2 * scale, offY + fh); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Usable width label inside zone
+    const usableW = ux2 - ux1;
+    const zonePixW = usableW * scale;
+    if (zonePixW > 60) {
+      ctx.fillStyle = 'rgba(74,158,255,0.45)';
+      ctx.font = '11px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(`usable ${usableW.toFixed(1)}m`, offX + (ux1 + ux2) / 2 * scale, offY + fh + 16);
+    }
+  }
+
+  // ── Floor boundary ──
+  ctx.strokeStyle = '#4a4a4a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(offX, offY, fw, fh);
+
+  // ── Dimension labels ──
+  dimLabel(offX + fw / 2, offY - 22, `${S.width.toFixed(1)} m`, 0);
+  dimLabel(offX - 30, offY + fh / 2, `${S.length.toFixed(1)} m`, -Math.PI / 2);
+
+  // ── Dormers ──
+  for (const d of S.dormers) drawDormer(d);
+
+  // ── Dormer draw preview ──
+  if (S.mode === 'dormer' && S.drawStart && S.mousePos) {
+    const [ax, ay] = m2c(S.drawStart[0], S.drawStart[1]);
+    const [bx, by] = m2c(S.mousePos[0], S.mousePos[1]);
+    ctx.fillStyle = 'rgba(255,160,50,0.12)';
+    ctx.fillRect(Math.min(ax,bx), Math.min(ay,by), Math.abs(bx-ax), Math.abs(by-ay));
+    ctx.strokeStyle = 'rgba(255,160,50,0.7)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 3]);
+    ctx.strokeRect(Math.min(ax,bx), Math.min(ay,by), Math.abs(bx-ax), Math.abs(by-ay));
+    ctx.setLineDash([]);
+    const wm = Math.abs(S.mousePos[0] - S.drawStart[0]);
+    const hm = Math.abs(S.mousePos[1] - S.drawStart[1]);
+    if (wm > 0.1 && hm > 0.1) {
+      dimTag(ctx, (ax+bx)/2, Math.min(ay,by) - 12, `${wm.toFixed(2)} × ${hm.toFixed(2)} m`, '#ffa030');
+    }
+    ctx.fillStyle = '#ffa030';
+    ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── Dormer cursor hint ──
+  if (S.mode === 'dormer' && S.mousePos && !S.drawStart) {
+    const [cx, cy] = m2c(S.mousePos[0], S.mousePos[1]);
+    ctx.strokeStyle = 'rgba(255,160,50,0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - 10, cy - 8, 20, 16);
+  }
+
+  // ── Walls ──
+  for (const w of S.walls) drawWall(w);
+
+  // ── Wall-draw preview ──
+  if (S.mode === 'wall' && S.drawStart && S.mousePos) {
+    const [ax, ay] = m2c(S.drawStart[0], S.drawStart[1]);
+    const [bx, by] = m2c(S.mousePos[0], S.mousePos[1]);
+    ctx.strokeStyle = 'rgba(255,200,70,0.65)';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+    ctx.setLineDash([]);
+
+    const dx = S.mousePos[0] - S.drawStart[0], dy = S.mousePos[1] - S.drawStart[1];
+    const len = Math.hypot(dx, dy);
+    if (len > 0.05) dimTag(ctx, (ax + bx) / 2, (ay + by) / 2 - 14, `${len.toFixed(2)} m`);
+
+    // Start dot
+    ctx.fillStyle = '#ffc850';
+    ctx.beginPath(); ctx.arc(ax, ay, 5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ── Snap cursor ──
+  if (S.mode === 'wall' && S.mousePos && !S.drawStart) {
+    const [cx, cy] = m2c(S.mousePos[0], S.mousePos[1]);
+    ctx.strokeStyle = 'rgba(255,200,70,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 7, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // ── Legend ──
+  ctx.font = '11px system-ui';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(74,158,255,0.4)';
+  ctx.fillRect(offX, offY + fh + 26, 14, 10);
+  ctx.fillStyle = '#555';
+  ctx.fillText(`≥ ${S.minH.toFixed(1)} m standing`, offX + 19, offY + fh + 35);
+  ctx.fillStyle = 'rgba(180,120,255,0.4)';
+  ctx.fillRect(offX + 148, offY + fh + 26, 14, 10);
+  ctx.fillStyle = '#555';
+  ctx.fillText(`${S.storageH.toFixed(1)}–${S.minH.toFixed(1)} m storage`, offX + 167, offY + fh + 35);
+  ctx.fillStyle = 'rgba(255,160,50,0.45)';
+  ctx.fillRect(offX + 315, offY + fh + 26, 14, 10);
+  ctx.fillStyle = '#555';
+  ctx.fillText('Dormer', offX + 334, offY + fh + 35);
+}
+
+function drawDormer(d) {
+  const sel = S.selectedId === `dormer-${d.id}`;
+  const [rx1, ry1, rx2, ry2] = dormerRect(d);
+  const [cx1, cy1] = m2c(rx1, ry1);
+  const [cx2, cy2] = m2c(rx2, ry2);
+  const pw = cx2 - cx1, ph = cy2 - cy1;
+
+  // Fill
+  ctx.fillStyle = sel ? 'rgba(255,160,50,0.18)' : 'rgba(255,140,30,0.1)';
+  ctx.fillRect(cx1, cy1, pw, ph);
+
+  // Border
+  ctx.strokeStyle = sel ? '#ffa030' : 'rgba(255,140,30,0.55)';
+  ctx.lineWidth = sel ? 2 : 1.5;
+  ctx.setLineDash([6, 3]);
+  ctx.strokeRect(cx1, cy1, pw, ph);
+  ctx.setLineDash([]);
+
+  // Corner marks
+  ctx.fillStyle = sel ? '#ffa030' : 'rgba(255,140,30,0.6)';
+  for (const [px, py] of [[cx1,cy1],[cx2,cy1],[cx1,cy2],[cx2,cy2]]) {
+    ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Height label inside
+  if (pw > 40 && ph > 20) {
+    dimTag(ctx, cx1 + pw/2, cy1 + ph/2, `↑ ${S.minH.toFixed(1)} m`, sel ? '#ffa030' : 'rgba(255,160,50,0.8)');
+  }
+
+  // Width × depth dims
+  const wm = rx2 - rx1, hm = ry2 - ry1;
+  if (pw > 30) dimTag(ctx, cx1 + pw/2, cy1 - 12, `${wm.toFixed(2)} m`, sel ? '#ffa030' : '#775533');
+  if (ph > 30) {
+    ctx.save();
+    ctx.translate(cx1 - 12, cy1 + ph/2);
+    ctx.rotate(-Math.PI/2);
+    dimTag(ctx, 0, 0, `${hm.toFixed(2)} m`, sel ? '#ffa030' : '#775533');
+    ctx.restore();
+  }
+}
+
+function drawWall(w) {
+  const sel = S.selectedId === w.id;
+  const [ax, ay] = m2c(w.x1, w.y1);
+  const [bx, by] = m2c(w.x2, w.y2);
+  const len = wallLen(w);
+  const angle = Math.atan2(w.y2 - w.y1, w.x2 - w.x1);
+  const sortedDoors = [...w.doors].sort((a, b) => a.pos - b.pos);
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // ── Draw wall segments around doors ──
+  let prevT = 0;
+  for (const d of sortedDoors) {
+    const hw = d.width / (2 * len);
+    const t0 = d.pos - hw, t1 = d.pos + hw;
+    drawSegment(ax, ay, bx, by, prevT, Math.max(prevT, t0), sel ? '#ffd060' : '#e0e0e0', 4);
+    prevT = Math.min(1, t1);
+  }
+  drawSegment(ax, ay, bx, by, prevT, 1, sel ? '#ffd060' : '#e0e0e0', 4);
+
+  // ── Doors ──
+  for (const d of sortedDoors) {
+    drawDoor(w, d, ax, ay, bx, by, len, angle);
+  }
+
+  // ── Dimension ──
+  if (len > 0.15) {
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const nx = -Math.sin(angle) * 15, ny = Math.cos(angle) * 15;
+    dimTag(ctx, mx + nx, my + ny, `${len.toFixed(2)} m`, sel ? '#ffc850' : '#888');
+  }
+
+  // ── Endpoints ──
+  ctx.fillStyle = sel ? '#ffc850' : '#888';
+  for (const [px, py] of [[ax, ay], [bx, by]]) {
+    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawSegment(ax, ay, bx, by, t0, t1, color, lw) {
+  if (t1 <= t0) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.beginPath();
+  ctx.moveTo(ax + (bx - ax) * t0, ay + (by - ay) * t0);
+  ctx.lineTo(ax + (bx - ax) * t1, ay + (by - ay) * t1);
+  ctx.stroke();
+}
+
+function drawDoor(w, d, ax, ay, bx, by, len, angle) {
+  const isDoorSel = S.selectedId === `door-${w.id}-${d.id}`;
+  const hw = d.width / (2 * len);
+  const t0 = d.pos - hw, t1 = d.pos + hw;
+
+  const dpx = ax + (bx - ax) * t0, dpy = ay + (by - ay) * t0;
+  const dpx2 = ax + (bx - ax) * t1, dpy2 = ay + (by - ay) * t1;
+
+  // Opening gap line
+  ctx.strokeStyle = isDoorSel ? '#ff9944' : '#666';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 2]);
+  ctx.beginPath(); ctx.moveTo(dpx, dpy); ctx.lineTo(dpx2, dpy2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Door swing arc
+  const doorPx = d.width * scale;
+  const swingDir = d.swing || 1;
+  const hinge = [dpx, dpy];  // hinge at start of door opening
+
+  ctx.strokeStyle = isDoorSel ? 'rgba(255,153,68,0.8)' : 'rgba(200,190,160,0.5)';
+  ctx.lineWidth = 1;
+
+  // Door leaf line
+  const leafAngle = angle + (Math.PI / 2) * swingDir;
+  ctx.beginPath();
+  ctx.moveTo(hinge[0], hinge[1]);
+  ctx.lineTo(hinge[0] + Math.cos(leafAngle) * doorPx, hinge[1] + Math.sin(leafAngle) * doorPx);
+  ctx.stroke();
+
+  // Arc
+  const arcStart = swingDir > 0 ? angle : angle - Math.PI / 2;
+  const arcEnd   = swingDir > 0 ? angle + Math.PI / 2 : angle;
+  ctx.beginPath();
+  ctx.arc(hinge[0], hinge[1], doorPx, arcStart, arcEnd, swingDir < 0);
+  ctx.stroke();
+
+  // Width label
+  const mx = (dpx + dpx2) / 2, my = (dpy + dpy2) / 2;
+  dimTag(ctx, mx + Math.cos(angle + Math.PI / 2) * 12, my + Math.sin(angle + Math.PI / 2) * 12,
+    `${d.width.toFixed(2)} m`, isDoorSel ? '#ff9944' : '#887055');
+}
+
+function dimLabel(x, y, text, angle) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = '#555';
+  ctx.font = '12px system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 0, 0);
+  ctx.restore();
+}
+
+function dimTag(c, x, y, text, color = '#888') {
+  c.font = '11px system-ui';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  const w = c.measureText(text).width + 8;
+  c.fillStyle = 'rgba(0,0,0,0.7)';
+  c.fillRect(x - w / 2, y - 8, w, 16);
+  c.fillStyle = color;
+  c.fillText(text, x, y);
+}
+
+// ═══════════════════════════════════════════════════════
+// Rendering — cross-section
+// ═══════════════════════════════════════════════════════
+function renderSection() {
+  const W = secCanvas.width, H = secCanvas.height;
+  sctx.clearRect(0, 0, W, H);
+  sctx.fillStyle = '#1c1c1c';
+  sctx.fillRect(0, 0, W, H);
+
+  const ml = 48, mr = 30, mt = 14, mb = 22;
+  const dw = W - ml - mr, dh = H - mt - mb;
+
+  const maxH = Math.max(S.ridgeH * 1.1, 3);
+  const ss = Math.min(dw / S.width, dh / maxH); // section scale
+  const sox = ml + (dw - S.width * ss) / 2;
+  const soy = mt + dh;  // baseline (floor level)
+
+  function sc(x, h) { return [sox + x * ss, soy - h * ss]; }
+
+  // Floor baseline
+  sctx.strokeStyle = '#333';
+  sctx.lineWidth = 1;
+  sctx.beginPath(); sctx.moveTo(sox, soy); sctx.lineTo(sox + S.width * ss, soy); sctx.stroke();
+
+  // Height gridlines + labels
+  for (let h = 0.5; h <= maxH; h += 0.5) {
+    const [, cy] = sc(0, h);
+    if (cy < mt) break;
+    sctx.strokeStyle = '#242424';
+    sctx.lineWidth = 1;
+    sctx.beginPath(); sctx.moveTo(ml, cy); sctx.lineTo(W - mr, cy); sctx.stroke();
+    sctx.fillStyle = '#3a3a3a';
+    sctx.font = '9px system-ui';
+    sctx.textAlign = 'right';
+    sctx.fillText(h.toFixed(1), ml - 4, cy + 3);
+  }
+
+  // Usable zone fill in section
+  const [ux1, ux2] = usableZoneX();
+  const [, minCY] = sc(0, S.minH);
+  if (ux2 > ux1) {
+    sctx.fillStyle = 'rgba(74,158,255,0.07)';
+    sctx.fillRect(sox + ux1 * ss, minCY, (ux2 - ux1) * ss, soy - minCY);
+  }
+
+  // Storage zone fill in section
+  const [sstx1, sstx2] = storageZoneX();
+  const [, storageCY] = sc(0, S.storageH);
+  if (sstx2 > sstx1) {
+    // Left storage band
+    if (sstx1 < ux1) {
+      sctx.fillStyle = 'rgba(180,120,255,0.07)';
+      sctx.fillRect(sox + sstx1 * ss, storageCY, Math.min(ux1, sstx2) * ss - sstx1 * ss, soy - storageCY);
+    }
+    // Right storage band
+    if (sstx2 > ux2) {
+      sctx.fillStyle = 'rgba(180,120,255,0.07)';
+      sctx.fillRect(sox + Math.max(ux2, sstx1) * ss, storageCY, (sstx2 - Math.max(ux2, sstx1)) * ss, soy - storageCY);
+    }
+  }
+
+  // Storage threshold dashed line
+  sctx.strokeStyle = 'rgba(180,120,255,0.3)';
+  sctx.lineWidth = 1;
+  sctx.setLineDash([3, 4]);
+  sctx.beginPath(); sctx.moveTo(sox, storageCY); sctx.lineTo(sox + S.width * ss, storageCY); sctx.stroke();
+  sctx.setLineDash([]);
+  sctx.fillStyle = 'rgba(180,120,255,0.5)';
+  sctx.font = '9px system-ui';
+  sctx.textAlign = 'left';
+  sctx.fillText(`${S.storageH.toFixed(1)} m`, sox + S.width * ss + 3, storageCY + 3);
+
+  // Min-height dashed line
+  sctx.strokeStyle = 'rgba(74,158,255,0.3)';
+  sctx.lineWidth = 1;
+  sctx.setLineDash([5, 4]);
+  sctx.beginPath(); sctx.moveTo(sox, minCY); sctx.lineTo(sox + S.width * ss, minCY); sctx.stroke();
+  sctx.setLineDash([]);
+  sctx.fillStyle = 'rgba(74,158,255,0.5)';
+  sctx.font = '9px system-ui';
+  sctx.textAlign = 'left';
+  sctx.fillText(`${S.minH.toFixed(1)} m`, sox + S.width * ss + 3, minCY + 3);
+
+  // Roof polygon
+  const rx = S.ridgePosX * S.width;
+  const [rcx, rcy] = sc(rx, S.ridgeH);
+  const [lx, ly] = sc(0, S.eavesH);
+  const [rrx, rry] = sc(S.width, S.eavesH);
+
+  sctx.fillStyle = 'rgba(80,85,100,0.35)';
+  sctx.beginPath();
+  sctx.moveTo(lx, ly); sctx.lineTo(rcx, rcy); sctx.lineTo(rrx, rry);
+  sctx.lineTo(rrx, soy); sctx.lineTo(lx, soy);
+  sctx.closePath(); sctx.fill();
+
+  sctx.strokeStyle = '#777';
+  sctx.lineWidth = 1.5;
+  sctx.beginPath(); sctx.moveTo(lx, ly); sctx.lineTo(rcx, rcy); sctx.lineTo(rrx, rry); sctx.stroke();
+
+  // Eaves walls
+  sctx.strokeStyle = '#444';
+  sctx.lineWidth = 1;
+  [[lx, ly], [rrx, rry]].forEach(([ex, ey]) => {
+    sctx.beginPath(); sctx.moveTo(ex, ey); sctx.lineTo(ex, soy); sctx.stroke();
+  });
+
+  // Ridge height annotation
+  sctx.fillStyle = '#666';
+  sctx.font = '10px system-ui';
+  sctx.textAlign = 'center';
+  sctx.fillText(`▲ ${S.ridgeH.toFixed(1)} m`, rcx, rcy - 6);
+
+  // Eaves height annotation
+  sctx.fillStyle = '#555';
+  sctx.fillText(`${S.eavesH.toFixed(1)} m`, lx - 8, ly + 3);
+
+  // ── Dormers at current Y slice ──
+  if (S.hoverYm !== null) {
+    for (const d of S.dormers) {
+      const [drx1, dry1, drx2, dry2] = dormerRect(d);
+      if (S.hoverYm < dry1 || S.hoverYm > dry2) continue;
+      // Draw dormer box in section
+      const [dcx1,] = sc(drx1, 0);
+      const [dcx2,] = sc(drx2, 0);
+      const [, dcTop] = sc(0, d.height);
+      sctx.fillStyle = 'rgba(255,140,30,0.12)';
+      sctx.fillRect(dcx1, dcTop, dcx2 - dcx1, soy - dcTop);
+      sctx.strokeStyle = 'rgba(255,140,30,0.6)';
+      sctx.lineWidth = 1.5;
+      // Front wall (vertical from floor to dormer ceiling)
+      sctx.beginPath(); sctx.moveTo(dcx1, soy); sctx.lineTo(dcx1, dcTop); sctx.stroke();
+      sctx.beginPath(); sctx.moveTo(dcx2, soy); sctx.lineTo(dcx2, dcTop); sctx.stroke();
+      // Ceiling (flat)
+      sctx.beginPath(); sctx.moveTo(dcx1, dcTop); sctx.lineTo(dcx2, dcTop); sctx.stroke();
+      // Dormer height label
+      sctx.fillStyle = 'rgba(255,160,50,0.7)';
+      sctx.font = '9px system-ui';
+      sctx.textAlign = 'center';
+      sctx.fillText(`dormer ${d.height.toFixed(1)} m`, (dcx1+dcx2)/2, dcTop - 4);
+    }
+  }
+
+  // Hover position indicator
+  if (S.hoverXm !== null) {
+    const hx = Math.max(0, Math.min(S.width, S.hoverXm));
+    const hh = roofHeightAt(hx, S.hoverYm ?? undefined);
+    const [hcx, hcy] = sc(hx, hh);
+    const [, hby] = sc(hx, 0);
+
+    sctx.strokeStyle = 'rgba(255,200,70,0.5)';
+    sctx.lineWidth = 1;
+    sctx.setLineDash([3, 2]);
+    sctx.beginPath(); sctx.moveTo(hcx, hby); sctx.lineTo(hcx, hcy); sctx.stroke();
+    sctx.setLineDash([]);
+
+    sctx.fillStyle = '#ffc850';
+    sctx.beginPath(); sctx.arc(hcx, hcy, 3, 0, Math.PI * 2); sctx.fill();
+
+    document.getElementById('heightBadge').textContent =
+      `Height at cursor: ${hh.toFixed(2)} m`;
+  } else {
+    document.getElementById('heightBadge').textContent = '';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// Mouse events
+// ═══════════════════════════════════════════════════════
+function getMetres(e) {
+  const rect = mainCanvas.getBoundingClientRect();
+  return c2m(e.clientX - rect.left, e.clientY - rect.top);
+}
+
+mainCanvas.addEventListener('mousemove', (e) => {
+  const [mx, my] = getMetres(e);
+  S.mousePos = snapPoint(mx, my);
+  S.hoverXm = mx;
+  S.hoverYm = my;
+
+  if (S.dragging) {
+    const { wallId, doorId } = S.dragging;
+    const w = S.walls.find(x => x.id === wallId);
+    const d = w?.doors.find(x => x.id === doorId);
+    if (w && d) {
+      const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+      const len = Math.hypot(dx, dy);
+      // Project mouse onto wall line
+      const t = ((mx - w.x1) * dx + (my - w.y1) * dy) / (len * len);
+      const hw = d.width / (2 * len);
+      d.pos = Math.max(hw, Math.min(1 - hw, t));
+    }
+  }
+  render();
+});
+
+mainCanvas.addEventListener('mouseleave', () => {
+  S.mousePos = null;
+  S.hoverXm = null;
+  S.hoverYm = null;
+  render();
+});
+
+mainCanvas.addEventListener('mousedown', (e) => {
+  if (S.mode !== 'select') return;
+  const [mx, my] = getMetres(e);
+
+  // Check for door drag start
+  for (const w of S.walls) {
+    for (const d of w.doors) {
+      const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+      const len = Math.hypot(dx, dy);
+      const doorX = w.x1 + dx * d.pos, doorY = w.y1 + dy * d.pos;
+      if (Math.hypot(mx - doorX, my - doorY) < 0.4) {
+        S.dragging = { wallId: w.id, doorId: d.id };
+        S.selectedId = `door-${w.id}-${d.id}`;
+        return;
+      }
+    }
+  }
+});
+
+mainCanvas.addEventListener('mouseup', () => {
+  S.dragging = null;
+});
+
+mainCanvas.addEventListener('click', (e) => {
+  if (S.dragging) return;
+  const [mx, my] = getMetres(e);
+  const [smx, smy] = snapPoint(mx, my);
+
+  if (S.mode === 'wall') {
+    if (!S.drawStart) {
+      S.drawStart = [smx, smy];
+    } else {
+      const len = Math.hypot(smx - S.drawStart[0], smy - S.drawStart[1]);
+      if (len > 0.1) {
+        S.walls.push({
+          id: newId(),
+          x1: S.drawStart[0], y1: S.drawStart[1],
+          x2: smx, y2: smy,
+          doors: [],
+        });
+      }
+      S.drawStart = null;
+    }
+    render();
+    return;
+  }
+
+  if (S.mode === 'dormer') {
+    if (!S.drawStart) {
+      S.drawStart = [smx, smy];
+    } else {
+      const wm = Math.abs(smx - S.drawStart[0]);
+      const hm = Math.abs(smy - S.drawStart[1]);
+      if (wm > 0.1 && hm > 0.1) {
+        S.dormers.push({
+          id: newId(),
+          x1: S.drawStart[0], y1: S.drawStart[1],
+          x2: smx, y2: smy,
+          height: S.minH,  // match minimum usable standing height
+        });
+      }
+      S.drawStart = null;
+    }
+    render();
+    return;
+  }
+
+  // Select mode — check dormers, then doors, then walls
+  for (const d of S.dormers) {
+    const [drx1, dry1, drx2, dry2] = dormerRect(d);
+    if (mx >= drx1 && mx <= drx2 && my >= dry1 && my <= dry2) {
+      S.selectedId = `dormer-${d.id}`;
+      render();
+      return;
+    }
+  }
+
+  for (const w of S.walls) {
+    for (const d of w.doors) {
+      const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+      const len = Math.hypot(dx, dy);
+      const doorX = w.x1 + dx * d.pos, doorY = w.y1 + dy * d.pos;
+      if (Math.hypot(mx - doorX, my - doorY) < 0.4) {
+        S.selectedId = `door-${w.id}-${d.id}`;
+        render();
+        return;
+      }
+    }
+  }
+
+  let best = null, bestD = 0.25;
+  for (const w of S.walls) {
+    const d = distToSegment(mx, my, w.x1, w.y1, w.x2, w.y2);
+    if (d < bestD) { bestD = d; best = w; }
+  }
+  S.selectedId = best ? best.id : null;
+  render();
+});
+
+mainCanvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (S.drawStart) { S.drawStart = null; render(); }
+});
+
+// ═══════════════════════════════════════════════════════
+// Actions
+// ═══════════════════════════════════════════════════════
+function setMode(m) {
+  S.mode = m;
+  S.drawStart = null;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  const map = { select: 'btnSelect', wall: 'btnWall', dormer: 'btnDormer' };
+  if (map[m]) document.getElementById(map[m]).classList.add('active');
+  render();
+}
+
+function addDoor() {
+  const w = S.walls.find(x => x.id === S.selectedId);
+  if (!w) return;
+  const len = wallLen(w);
+  if (len < 0.9) return;
+  const id = newId();
+  w.doors.push({ id, pos: 0.5, width: 0.9, swing: 1 });
+  render();
+}
+
+function deleteSelected() {
+  if (S.selectedId === null) return;
+  if (typeof S.selectedId === 'string' && S.selectedId.startsWith('door-')) {
+    const [, wid, did] = S.selectedId.split('-').map(Number);
+    const w = S.walls.find(x => x.id === wid);
+    if (w) w.doors = w.doors.filter(d => d.id !== did);
+  } else if (typeof S.selectedId === 'string' && S.selectedId.startsWith('dormer-')) {
+    const id = parseInt(S.selectedId.split('-')[1]);
+    S.dormers = S.dormers.filter(d => d.id !== id);
+  } else {
+    S.walls = S.walls.filter(w => w.id !== S.selectedId);
+  }
+  S.selectedId = null;
+  render();
+}
+
+function changeDormerHeight(delta) {
+  // No-op: dormer height tracks minH automatically
+}
+
+function flipDoorSwing() {
+  if (typeof S.selectedId !== 'string') return;
+  const [, wid, did] = S.selectedId.split('-').map(Number);
+  const w = S.walls.find(x => x.id === wid);
+  const d = w?.doors.find(x => x.id === did);
+  if (d) { d.swing = (d.swing || 1) * -1; render(); }
+}
+
+function changeDoorWidth(delta) {
+  if (typeof S.selectedId !== 'string') return;
+  const [, wid, did] = S.selectedId.split('-').map(Number);
+  const w = S.walls.find(x => x.id === wid);
+  const d = w?.doors.find(x => x.id === did);
+  if (!d || !w) return;
+  const len = wallLen(w);
+  d.width = Math.max(0.5, Math.min(len * 0.9, d.width + delta));
+  const hw = d.width / (2 * len);
+  d.pos = Math.max(hw, Math.min(1 - hw, d.pos));
+  render();
+}
+
+// ═══════════════════════════════════════════════════════
+// Info panel
+// ═══════════════════════════════════════════════════════
+function updateInfo() {
+  const el = document.getElementById('infoContent');
+
+  if (S.mode === 'wall') {
+    el.innerHTML = S.drawStart
+      ? '<strong>Click</strong> to place wall end<br><strong>Right-click</strong> or <strong>Esc</strong> to cancel'
+      : '<strong>Click</strong> to start drawing a wall<br><strong>S</strong> to switch to Select';
+    return;
+  }
+
+  if (S.mode === 'dormer') {
+    el.innerHTML = S.drawStart
+      ? '<strong>Click</strong> to set opposite corner<br><strong>Right-click</strong> or <strong>Esc</strong> to cancel'
+      : '<strong>Click &amp; drag</strong> to draw a dormer area<br>Height defaults to ridge height<br><strong>S</strong> to switch to Select';
+    return;
+  }
+
+  // No selection
+  if (S.selectedId === null) {
+    const [ux1, ux2] = usableZoneX();
+    el.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <div>Usable width: <strong>${(ux2 - ux1).toFixed(2)} m</strong></div>
+        <div style="color:#555">at ≥ ${S.minH.toFixed(1)} m height</div>
+      </div>
+      <div style="color:#555;font-size:11px;">
+        <strong style="color:#888">W</strong> — draw walls<br>
+        <strong style="color:#888">D</strong> — draw dormer<br>
+        Click a wall, door or dormer to select<br>
+        <strong style="color:#888">Esc</strong> — deselect
+      </div>`;
+    return;
+  }
+
+  // Dormer selected
+  if (typeof S.selectedId === 'string' && S.selectedId.startsWith('dormer-')) {
+    const id = parseInt(S.selectedId.split('-')[1]);
+    const d = S.dormers.find(x => x.id === id);
+    if (!d) return;
+    const [drx1, dry1, drx2, dry2] = dormerRect(d);
+    el.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <div>Dormer selected</div>
+        <div>Width: <strong>${(drx2-drx1).toFixed(2)} m</strong></div>
+        <div>Depth: <strong>${(dry2-dry1).toFixed(2)} m</strong></div>
+        <div>Ceiling height: <strong>${S.minH.toFixed(2)} m</strong> <span style="color:#555;font-size:10px;">(tracks min standing height)</span></div>
+      </div>
+      <button class="action-btn danger" onclick="deleteSelected()">✕ Delete Dormer</button>`;
+    return;
+  }
+
+  // Wall selected
+  if (typeof S.selectedId === 'number') {
+    const w = S.walls.find(x => x.id === S.selectedId);
+    if (!w) return;
+    el.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <div>Wall: <strong>${wallLen(w).toFixed(2)} m</strong></div>
+        <div>Doors: ${w.doors.length}</div>
+      </div>
+      <button class="action-btn" onclick="addDoor()">+ Add Door (0.9 m)</button>
+      <button class="action-btn danger" onclick="deleteSelected()">✕ Delete Wall</button>`;
+    return;
+  }
+
+  // Door selected
+  if (typeof S.selectedId === 'string') {
+    const [, wid, did] = S.selectedId.split('-').map(Number);
+    const w = S.walls.find(x => x.id === wid);
+    const d = w?.doors.find(x => x.id === did);
+    if (!d) return;
+    el.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <div>Door width: <strong>${d.width.toFixed(2)} m</strong></div>
+        <div style="color:#555;font-size:11px;">Drag door to reposition</div>
+      </div>
+      <button class="action-btn" onclick="changeDoorWidth(-0.1)">− Narrower (−10 cm)</button>
+      <button class="action-btn" onclick="changeDoorWidth(0.1)">+ Wider (+10 cm)</button>
+      <button class="action-btn" onclick="flipDoorSwing()">↕ Flip swing direction</button>
+      <button class="action-btn danger" onclick="deleteSelected()">✕ Delete Door</button>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// Controls wiring
+// ═══════════════════════════════════════════════════════
+function wireRange(id, key, displayId, fmt, callback) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => {
+    S[key] = parseFloat(el.value);
+    document.getElementById(displayId).textContent = fmt(S[key]);
+    if (callback) callback();
+    resizeAll();
+  });
+}
+
+wireRange('ctrlWidth',    'width',    'widthVal',    v => `${v.toFixed(1)} m`);
+wireRange('ctrlLength',   'length',   'lengthVal',   v => `${v.toFixed(1)} m`);
+wireRange('ctrlRidgeH',   'ridgeH',   'ridgeHVal',   v => `${v.toFixed(1)} m`);
+wireRange('ctrlEavesH',   'eavesH',   'eavesHVal',   v => `${v.toFixed(1)} m`);
+wireRange('ctrlMinH',     'minH',     'minHVal',     v => `${v.toFixed(1)} m`);
+wireRange('ctrlStorageH', 'storageH', 'storageHVal', v => `${v.toFixed(1)} m`);
+
+document.getElementById('ctrlRidgePos').addEventListener('input', (e) => {
+  S.ridgePosX = parseFloat(e.target.value) / 100;
+  const v = parseFloat(e.target.value);
+  document.getElementById('ridgePosVal').textContent =
+    v === 50 ? 'Centre' : `${v}% from left`;
+  render();
+});
+
+// ═══════════════════════════════════════════════════════
+// Keyboard shortcuts
+// ═══════════════════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  switch (e.key) {
+    case 'Escape':
+      if (S.drawStart) { S.drawStart = null; render(); }
+      else { S.selectedId = null; render(); }
+      break;
+    case 'Delete':
+    case 'Backspace':
+      deleteSelected();
+      break;
+    case 'w': case 'W':
+      setMode('wall');
+      break;
+    case 'd': case 'D':
+      setMode('dormer');
+      break;
+    case 's': case 'S':
+      setMode('select');
+      break;
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// URL state persistence
+// ═══════════════════════════════════════════════════════
+function saveToURL() {
+  const data = {
+    w: S.width, l: S.length,
+    rh: S.ridgeH, eh: S.eavesH, rp: S.ridgePosX, mh: S.minH, sh: S.storageH,
+    walls: S.walls.map(w => ({
+      id: w.id, x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2,
+      doors: w.doors.map(d => ({ id: d.id, pos: d.pos, width: d.width, swing: d.swing }))
+    })),
+    dormers: S.dormers.map(d => ({ id: d.id, x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2, height: d.height }))
+  };
+  const encoded = btoa(JSON.stringify(data));
+  history.replaceState(null, '', '#' + encoded);
+}
+
+function loadFromURL() {
+  const hash = location.hash.slice(1);
+  if (!hash) return false;
+  try {
+    const data = JSON.parse(atob(hash));
+    S.width    = data.w  ?? S.width;
+    S.length   = data.l  ?? S.length;
+    S.ridgeH   = data.rh ?? S.ridgeH;
+    S.eavesH   = data.eh ?? S.eavesH;
+    S.ridgePosX = data.rp ?? S.ridgePosX;
+    S.minH     = data.mh ?? S.minH;
+    S.storageH = data.sh ?? S.storageH;
+    S.walls    = data.walls ?? [];
+    S.dormers  = data.dormers ?? [];
+    // Restore nextId above any existing IDs
+    let maxId = 0;
+    for (const w of S.walls) {
+      maxId = Math.max(maxId, w.id);
+      for (const d of w.doors) maxId = Math.max(maxId, d.id);
+    }
+    for (const d of S.dormers) maxId = Math.max(maxId, d.id);
+    S._nextId = maxId + 1;
+    syncControls();
+    return true;
+  } catch { return false; }
+}
+
+function syncControls() {
+  document.getElementById('ctrlWidth').value  = S.width;
+  document.getElementById('ctrlLength').value = S.length;
+  document.getElementById('ctrlRidgeH').value = S.ridgeH;
+  document.getElementById('ctrlEavesH').value = S.eavesH;
+  document.getElementById('ctrlMinH').value     = S.minH;
+  document.getElementById('ctrlStorageH').value = S.storageH;
+  const pct = Math.round(S.ridgePosX * 100);
+  document.getElementById('ctrlRidgePos').value = pct;
+
+  document.getElementById('widthVal').textContent  = `${S.width.toFixed(1)} m`;
+  document.getElementById('lengthVal').textContent = `${S.length.toFixed(1)} m`;
+  document.getElementById('ridgeHVal').textContent = `${S.ridgeH.toFixed(1)} m`;
+  document.getElementById('eavesHVal').textContent = `${S.eavesH.toFixed(1)} m`;
+  document.getElementById('minHVal').textContent      = `${S.minH.toFixed(1)} m`;
+  document.getElementById('storageHVal').textContent = `${S.storageH.toFixed(1)} m`;
+  document.getElementById('ridgePosVal').textContent =
+    pct === 50 ? 'Centre' : `${pct}% from left`;
+}
+
+function copyLink() {
+  navigator.clipboard.writeText(location.href).then(() => {
+    const btn = document.getElementById('copyLinkBtn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '⎘ Copy link'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════════
+window.addEventListener('resize', resizeAll);
+loadFromURL();
+resizeAll();
+</script>
+</body>
+</html>
