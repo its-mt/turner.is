@@ -62,7 +62,23 @@ body {
   letter-spacing: 0.08em;
   color: #666;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+.h2-btn {
+  font-size: 9px;
+  font-weight: 500;
+  padding: 2px 7px;
+  background: #2e2e2e;
+  border: 1px solid #3a3a3a;
+  color: #888;
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.h2-btn:hover { background: #363636; color: #ccc; }
 .field { margin-bottom: 8px; }
 .field label {
   display: flex;
@@ -74,15 +90,15 @@ body {
 .field label span { color: #e0e0e0; font-variant-numeric: tabular-nums; }
 .field input[type=range] { width: 100%; accent-color: #4a9eff; cursor: pointer; }
 
-/* ── Tools ── */
+/* ── Tools 2×2 grid ── */
 .tools {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 5px;
   padding: 10px 14px;
   border-bottom: 1px solid #333;
 }
 .tool-btn {
-  flex: 1;
   padding: 7px 2px;
   background: #2e2e2e;
   border: 1px solid #3a3a3a;
@@ -141,6 +157,52 @@ body {
 .action-btn:hover { background: #383838; color: #fff; }
 .action-btn.danger { border-color: #5a2a2a; color: #e07070; }
 .action-btn.danger:hover { background: #3a2020; }
+
+/* ── Dormer list ── */
+.dormer-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+  font-size: 11px;
+  border-bottom: 1px solid #2a2a2a;
+  cursor: pointer;
+}
+.dormer-row:last-of-type { border-bottom: none; }
+.dormer-row-label { flex: 1; color: #999; }
+.dormer-row.selected .dormer-row-label { color: #4a9eff; }
+.dormer-del { color: #555; cursor: pointer; padding: 0 4px; font-size: 13px; line-height: 1; }
+.dormer-del:hover { color: #e07070; }
+.dormer-inputs { display: flex; gap: 6px; padding: 4px 0 2px; }
+.dormer-inputs label { font-size: 10px; color: #666; display: flex; align-items: center; gap: 3px; }
+.dormer-inputs input[type=number] {
+  width: 50px; padding: 2px 4px;
+  background: #1e1e1e; border: 1px solid #3a3a3a;
+  color: #ddd; border-radius: 3px; font-size: 10px;
+}
+
+/* ── Furniture palette ── */
+.furniture-palette {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 6px;
+}
+.furn-btn {
+  padding: 5px 4px;
+  background: #2e2e2e;
+  border: 1px solid #3a3a3a;
+  color: #aaa;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  text-align: center;
+  transition: background 0.1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.furn-btn:hover { background: #383838; color: #fff; }
 
 /* ── Main area ── */
 .main {
@@ -229,6 +291,11 @@ body {
     </div>
   </div>
 
+  <div class="section" id="dormersSection">
+    <h2>Dormers <button class="h2-btn" onclick="setMode('dormer')">+ Add</button></h2>
+    <div id="dormerList"></div>
+  </div>
+
   <div class="section" id="metricsSection">
     <h2>Conversion metrics</h2>
     <div id="metricsContent"></div>
@@ -238,6 +305,7 @@ body {
     <button class="tool-btn active" id="btnSelect" onclick="setMode('select')">↖ Select</button>
     <button class="tool-btn" id="btnWall" onclick="setMode('wall')">▬ Wall</button>
     <button class="tool-btn" id="btnDormer" onclick="setMode('dormer')">⬜ Dormer</button>
+    <button class="tool-btn" id="btnFurniture" onclick="setMode('furniture')">🪑 Furniture</button>
   </div>
 
   <div class="info-panel" id="infoPanel">
@@ -258,6 +326,23 @@ body {
 
 <script>
 // ═══════════════════════════════════════════════════════
+// Furniture presets
+// ═══════════════════════════════════════════════════════
+const FURNITURE = {
+  'Single bed':   { w: 0.9,  h: 1.9, icon: '🛏' },
+  'Double bed':   { w: 1.4,  h: 1.9, icon: '🛏' },
+  'King bed':     { w: 1.6,  h: 2.0, icon: '🛏' },
+  'Desk':         { w: 1.2,  h: 0.6, icon: '🖥' },
+  'Wardrobe':     { w: 1.2,  h: 0.6, icon: '🚪' },
+  'Sofa':         { w: 2.0,  h: 0.9, icon: '🛋' },
+  'Armchair':     { w: 0.8,  h: 0.8, icon: '💺' },
+  'Dining table': { w: 1.4,  h: 0.8, icon: '🍽' },
+  'Bath':         { w: 1.7,  h: 0.7, icon: '🛁' },
+  'Shower':       { w: 0.9,  h: 0.9, icon: '🚿' },
+  'Toilet':       { w: 0.4,  h: 0.7, icon: '🚽' },
+};
+
+// ═══════════════════════════════════════════════════════
 // State
 // ═══════════════════════════════════════════════════════
 const S = {
@@ -266,32 +351,38 @@ const S = {
   length: 8,
   ridgeH: 2.5,
   eavesH: 0.8,
-  ridgePosX: 0.5,   // 0..1 fraction of width
+  ridgePosX: 0.5,
   minH: 1.9,
-  storageH: 0.9,    // min height for low storage zone
+  storageH: 0.9,
 
   // Geometry
   walls: [],        // [{id, x1,y1,x2,y2, doors:[{id,pos,width,swing}]}]
   dormers: [],      // [{id, x1,y1,x2,y2, height}]
+  furniture: [],    // [{id, type, x, y, w, h, rotation}]
 
   // Interaction
-  mode: 'select',   // 'select' | 'wall' | 'dormer'
-  drawStart: null,  // [x,y] metres
-  mousePos: null,   // [x,y] metres, snapped
-  selectedId: null, // wallId (number) | 'door-<wid>-<did>' | 'dormer-<id>' (string)
-  dragging: null,   // {type:'door', wallId, doorId} while mousedown
-  hoverXm: null,    // raw X in metres for cross-section indicator
-  hoverYm: null,    // raw Y in metres
+  mode: 'select',
+  drawStart: null,
+  mousePos: null,
+  selectedId: null,
+  dragging: null,
+  hoverXm: null,
+  hoverYm: null,
 
   snapGrid: 0.25,
   _nextId: 1,
 };
+
+// Track whether mouse moved during a press (to distinguish click vs drag)
+let _dragMoved = false;
 
 function newId() { return S._nextId++; }
 
 // ═══════════════════════════════════════════════════════
 // Geometry helpers
 // ═══════════════════════════════════════════════════════
+function snap(v) { return Math.round(v / S.snapGrid) * S.snapGrid; }
+
 function roofSlopeAt(x) {
   const rx = S.ridgePosX * S.width;
   const t = x <= rx
@@ -301,7 +392,6 @@ function roofSlopeAt(x) {
 }
 
 function roofHeightAt(x, y) {
-  // Dormers override the slope height — height always tracks minH
   if (y !== undefined) {
     for (const d of S.dormers) {
       const minX = Math.min(d.x1, d.x2), maxX = Math.max(d.x1, d.x2);
@@ -317,7 +407,6 @@ function dormerRect(d) {
 }
 
 function heightZoneX(minHeight) {
-  // Returns [x1, x2] where roof slope is >= minHeight
   if (S.ridgeH <= minHeight) return [S.ridgePosX * S.width, S.ridgePosX * S.width];
   if (S.eavesH >= minHeight) return [0, S.width];
   const frac = (minHeight - S.eavesH) / (S.ridgeH - S.eavesH);
@@ -345,13 +434,17 @@ function snapPoint(mx, my) {
   const g = S.snapGrid;
   let x = Math.round(Math.max(0, Math.min(S.width, mx)) / g) * g;
   let y = Math.round(Math.max(0, Math.min(S.length, my)) / g) * g;
-  // Snap to existing endpoints
   for (const w of S.walls) {
     for (const [ex, ey] of [[w.x1, w.y1], [w.x2, w.y2]]) {
       if (Math.hypot(mx - ex, my - ey) < 0.35) { x = ex; y = ey; }
     }
   }
   return [x, y];
+}
+
+// Returns visual [width, height] of furniture accounting for rotation
+function furnDims(f) {
+  return f.rotation % 2 === 0 ? [f.w, f.h] : [f.h, f.w];
 }
 
 // ═══════════════════════════════════════════════════════
@@ -364,7 +457,7 @@ const sctx = secCanvas.getContext('2d');
 const canvasArea = document.getElementById('canvasArea');
 const crossSection = document.getElementById('crossSection');
 
-let scale = 80;   // px per metre
+let scale = 80;
 let offX = 60, offY = 50;
 
 function fitScale() {
@@ -384,16 +477,13 @@ function resizeAll() {
   render();
 }
 
-// metres → canvas
 function m2c(mx, my) { return [offX + mx * scale, offY + my * scale]; }
-// canvas → metres (raw, unsnapped)
 function c2m(cx, cy) { return [(cx - offX) / scale, (cy - offY) / scale]; }
 
 // ═══════════════════════════════════════════════════════
 // Rendering — main canvas
 // ═══════════════════════════════════════════════════════
 function computeMetrics() {
-  // Sample on a 0.1m grid — handles dormers and irregular shapes naturally
   const step = 0.1;
   const cellArea = step * step;
   let standingArea = 0, storageArea = 0, volume = 0;
@@ -426,11 +516,49 @@ function updateMetrics() {
     </div>`;
 }
 
+function updateDormerList() {
+  const el = document.getElementById('dormerList');
+  if (S.dormers.length === 0) {
+    el.innerHTML = '<div style="color:#444;font-size:11px;padding:2px 0;">No dormers — click + Add or press D</div>';
+    return;
+  }
+  el.innerHTML = '';
+  S.dormers.forEach((d, i) => {
+    const [rx1, ry1, rx2, ry2] = dormerRect(d);
+    const wm = (rx2 - rx1).toFixed(2);
+    const hm = (ry2 - ry1).toFixed(2);
+    const sel = S.selectedId === `dormer-${d.id}`;
+
+    const row = document.createElement('div');
+    row.className = 'dormer-row' + (sel ? ' selected' : '');
+    row.innerHTML = `<span class="dormer-row-label">Dormer ${i+1} — ${wm}×${hm} m</span>
+      <span class="dormer-del" onclick="deleteDormer(${d.id})" title="Delete">×</span>`;
+    row.addEventListener('click', (e) => {
+      if (e.target.classList.contains('dormer-del')) return;
+      S.selectedId = `dormer-${d.id}`;
+      render();
+    });
+    el.appendChild(row);
+
+    if (sel) {
+      const inputs = document.createElement('div');
+      inputs.className = 'dormer-inputs';
+      inputs.innerHTML = `
+        <label>W <input type="number" min="0.25" step="0.25" value="${wm}"
+          onchange="resizeDormer(${d.id},'w',this.value)"></label>
+        <label>D <input type="number" min="0.25" step="0.25" value="${hm}"
+          onchange="resizeDormer(${d.id},'d',this.value)"></label>`;
+      el.appendChild(inputs);
+    }
+  });
+}
+
 function render() {
   renderMain();
   renderSection();
   updateInfo();
   updateMetrics();
+  updateDormerList();
   saveToURL();
 }
 
@@ -459,10 +587,9 @@ function renderMain() {
     ctx.stroke();
   }
 
-  // ── Storage zone (between storageH and minH) ──
+  // ── Storage zone ──
   const [sx1, sx2] = storageZoneX();
   const [ux1, ux2] = usableZoneX();
-  // Left storage band
   if (sx1 < ux1) {
     ctx.fillStyle = 'rgba(180,120,255,0.07)';
     ctx.fillRect(offX + sx1 * scale, offY, (ux1 - sx1) * scale, fh);
@@ -475,7 +602,6 @@ function renderMain() {
     }
     ctx.setLineDash([]);
   }
-  // Right storage band
   if (sx2 > ux2) {
     ctx.fillStyle = 'rgba(180,120,255,0.07)';
     ctx.fillRect(offX + ux2 * scale, offY, (sx2 - ux2) * scale, fh);
@@ -507,7 +633,6 @@ function renderMain() {
     }
     ctx.setLineDash([]);
 
-    // Usable width label inside zone
     const usableW = ux2 - ux1;
     const zonePixW = usableW * scale;
     if (zonePixW > 60) {
@@ -527,16 +652,16 @@ function renderMain() {
   dimLabel(offX + fw / 2, offY - 22, `${S.width.toFixed(1)} m`, 0);
   dimLabel(offX - 30, offY + fh / 2, `${S.length.toFixed(1)} m`, -Math.PI / 2);
 
-  // ── Dormers ──
+  // ── Dormers (draw before furniture/walls so they sit in background) ──
   for (const d of S.dormers) drawDormer(d);
 
   // ── Dormer draw preview ──
   if (S.mode === 'dormer' && S.drawStart && S.mousePos) {
     const [ax, ay] = m2c(S.drawStart[0], S.drawStart[1]);
     const [bx, by] = m2c(S.mousePos[0], S.mousePos[1]);
-    ctx.fillStyle = 'rgba(255,160,50,0.12)';
+    ctx.fillStyle = 'rgba(74,158,255,0.10)';
     ctx.fillRect(Math.min(ax,bx), Math.min(ay,by), Math.abs(bx-ax), Math.abs(by-ay));
-    ctx.strokeStyle = 'rgba(255,160,50,0.7)';
+    ctx.strokeStyle = 'rgba(74,158,255,0.6)';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 3]);
     ctx.strokeRect(Math.min(ax,bx), Math.min(ay,by), Math.abs(bx-ax), Math.abs(by-ay));
@@ -544,21 +669,24 @@ function renderMain() {
     const wm = Math.abs(S.mousePos[0] - S.drawStart[0]);
     const hm = Math.abs(S.mousePos[1] - S.drawStart[1]);
     if (wm > 0.1 && hm > 0.1) {
-      dimTag(ctx, (ax+bx)/2, Math.min(ay,by) - 12, `${wm.toFixed(2)} × ${hm.toFixed(2)} m`, '#ffa030');
+      dimTag(ctx, (ax+bx)/2, Math.min(ay,by) - 12, `${wm.toFixed(2)} × ${hm.toFixed(2)} m`, '#4a9eff');
     }
-    ctx.fillStyle = '#ffa030';
+    ctx.fillStyle = '#4a9eff';
     ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI*2); ctx.fill();
   }
 
   // ── Dormer cursor hint ──
   if (S.mode === 'dormer' && S.mousePos && !S.drawStart) {
     const [cx, cy] = m2c(S.mousePos[0], S.mousePos[1]);
-    ctx.strokeStyle = 'rgba(255,160,50,0.4)';
+    ctx.strokeStyle = 'rgba(74,158,255,0.4)';
     ctx.lineWidth = 1;
     ctx.strokeRect(cx - 10, cy - 8, 20, 16);
   }
 
-  // ── Walls ──
+  // ── Furniture ──
+  for (const f of S.furniture) drawFurniture(f);
+
+  // ── Walls (on top of furniture) ──
   for (const w of S.walls) drawWall(w);
 
   // ── Wall-draw preview ──
@@ -575,12 +703,11 @@ function renderMain() {
     const len = Math.hypot(dx, dy);
     if (len > 0.05) dimTag(ctx, (ax + bx) / 2, (ay + by) / 2 - 14, `${len.toFixed(2)} m`);
 
-    // Start dot
     ctx.fillStyle = '#ffc850';
     ctx.beginPath(); ctx.arc(ax, ay, 5, 0, Math.PI * 2); ctx.fill();
   }
 
-  // ── Snap cursor ──
+  // ── Snap cursor (wall mode) ──
   if (S.mode === 'wall' && S.mousePos && !S.drawStart) {
     const [cx, cy] = m2c(S.mousePos[0], S.mousePos[1]);
     ctx.strokeStyle = 'rgba(255,200,70,0.4)';
@@ -591,18 +718,21 @@ function renderMain() {
   // ── Legend ──
   ctx.font = '11px system-ui';
   ctx.textAlign = 'left';
+  let lx = offX;
   ctx.fillStyle = 'rgba(74,158,255,0.4)';
-  ctx.fillRect(offX, offY + fh + 26, 14, 10);
+  ctx.fillRect(lx, offY + fh + 26, 14, 10);
   ctx.fillStyle = '#555';
-  ctx.fillText(`≥ ${S.minH.toFixed(1)} m standing`, offX + 19, offY + fh + 35);
+  ctx.fillText(`≥ ${S.minH.toFixed(1)} m standing`, lx + 19, offY + fh + 35);
+  lx += 160;
   ctx.fillStyle = 'rgba(180,120,255,0.4)';
-  ctx.fillRect(offX + 148, offY + fh + 26, 14, 10);
+  ctx.fillRect(lx, offY + fh + 26, 14, 10);
   ctx.fillStyle = '#555';
-  ctx.fillText(`${S.storageH.toFixed(1)}–${S.minH.toFixed(1)} m storage`, offX + 167, offY + fh + 35);
-  ctx.fillStyle = 'rgba(255,160,50,0.45)';
-  ctx.fillRect(offX + 315, offY + fh + 26, 14, 10);
+  ctx.fillText(`${S.storageH.toFixed(1)}–${S.minH.toFixed(1)} m storage`, lx + 19, offY + fh + 35);
+  lx += 175;
+  ctx.fillStyle = 'rgba(255,160,50,0.55)';
+  ctx.fillRect(lx, offY + fh + 26, 14, 10);
   ctx.fillStyle = '#555';
-  ctx.fillText('Dormer', offX + 334, offY + fh + 35);
+  ctx.fillText('Furniture: low headroom', lx + 19, offY + fh + 35);
 }
 
 function drawDormer(d) {
@@ -612,36 +742,33 @@ function drawDormer(d) {
   const [cx2, cy2] = m2c(rx2, ry2);
   const pw = cx2 - cx1, ph = cy2 - cy1;
 
-  // Fill
-  ctx.fillStyle = sel ? 'rgba(255,160,50,0.18)' : 'rgba(255,140,30,0.1)';
+  // Blue fill — visually merges with usable zone
+  ctx.fillStyle = sel ? 'rgba(74,158,255,0.18)' : 'rgba(74,158,255,0.10)';
   ctx.fillRect(cx1, cy1, pw, ph);
 
-  // Border
-  ctx.strokeStyle = sel ? '#ffa030' : 'rgba(255,140,30,0.55)';
+  ctx.strokeStyle = sel ? '#4a9eff' : 'rgba(74,158,255,0.4)';
   ctx.lineWidth = sel ? 2 : 1.5;
   ctx.setLineDash([6, 3]);
   ctx.strokeRect(cx1, cy1, pw, ph);
   ctx.setLineDash([]);
 
-  // Corner marks
-  ctx.fillStyle = sel ? '#ffa030' : 'rgba(255,140,30,0.6)';
+  // Corner dots — blue
+  ctx.fillStyle = sel ? '#4a9eff' : 'rgba(74,158,255,0.6)';
   for (const [px, py] of [[cx1,cy1],[cx2,cy1],[cx1,cy2],[cx2,cy2]]) {
     ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI*2); ctx.fill();
   }
 
-  // Height label inside
   if (pw > 40 && ph > 20) {
-    dimTag(ctx, cx1 + pw/2, cy1 + ph/2, `↑ ${S.minH.toFixed(1)} m`, sel ? '#ffa030' : 'rgba(255,160,50,0.8)');
+    dimTag(ctx, cx1 + pw/2, cy1 + ph/2, `↑ ${S.minH.toFixed(1)} m`, sel ? '#4a9eff' : 'rgba(74,158,255,0.8)');
   }
 
-  // Width × depth dims
   const wm = rx2 - rx1, hm = ry2 - ry1;
-  if (pw > 30) dimTag(ctx, cx1 + pw/2, cy1 - 12, `${wm.toFixed(2)} m`, sel ? '#ffa030' : '#775533');
+  if (pw > 30) dimTag(ctx, cx1 + pw/2, cy1 - 12, `${wm.toFixed(2)} m`, sel ? '#4a9eff' : 'rgba(74,158,255,0.5)');
   if (ph > 30) {
     ctx.save();
     ctx.translate(cx1 - 12, cy1 + ph/2);
     ctx.rotate(-Math.PI/2);
-    dimTag(ctx, 0, 0, `${hm.toFixed(2)} m`, sel ? '#ffa030' : '#775533');
+    dimTag(ctx, 0, 0, `${hm.toFixed(2)} m`, sel ? '#4a9eff' : 'rgba(74,158,255,0.5)');
     ctx.restore();
   }
 }
@@ -657,7 +784,6 @@ function drawWall(w) {
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  // ── Draw wall segments around doors ──
   let prevT = 0;
   for (const d of sortedDoors) {
     const hw = d.width / (2 * len);
@@ -667,22 +793,31 @@ function drawWall(w) {
   }
   drawSegment(ax, ay, bx, by, prevT, 1, sel ? '#ffd060' : '#e0e0e0', 4);
 
-  // ── Doors ──
   for (const d of sortedDoors) {
     drawDoor(w, d, ax, ay, bx, by, len, angle);
   }
 
-  // ── Dimension ──
   if (len > 0.15) {
     const mx = (ax + bx) / 2, my = (ay + by) / 2;
     const nx = -Math.sin(angle) * 15, ny = Math.cos(angle) * 15;
     dimTag(ctx, mx + nx, my + ny, `${len.toFixed(2)} m`, sel ? '#ffc850' : '#888');
   }
 
-  // ── Endpoints ──
-  ctx.fillStyle = sel ? '#ffc850' : '#888';
-  for (const [px, py] of [[ax, ay], [bx, by]]) {
-    ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+  // Endpoint dots — larger blue handles when selected to hint draggability
+  if (sel) {
+    ctx.fillStyle = '#4a9eff';
+    for (const [px, py] of [[ax, ay], [bx, by]]) {
+      ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#1a2a4a';
+    for (const [px, py] of [[ax, ay], [bx, by]]) {
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = '#888';
+    for (const [px, py] of [[ax, ay], [bx, by]]) {
+      ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+    }
   }
 }
 
@@ -704,39 +839,85 @@ function drawDoor(w, d, ax, ay, bx, by, len, angle) {
   const dpx = ax + (bx - ax) * t0, dpy = ay + (by - ay) * t0;
   const dpx2 = ax + (bx - ax) * t1, dpy2 = ay + (by - ay) * t1;
 
-  // Opening gap line
   ctx.strokeStyle = isDoorSel ? '#ff9944' : '#666';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([3, 2]);
   ctx.beginPath(); ctx.moveTo(dpx, dpy); ctx.lineTo(dpx2, dpy2); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Door swing arc
   const doorPx = d.width * scale;
   const swingDir = d.swing || 1;
-  const hinge = [dpx, dpy];  // hinge at start of door opening
+  const hinge = [dpx, dpy];
 
   ctx.strokeStyle = isDoorSel ? 'rgba(255,153,68,0.8)' : 'rgba(200,190,160,0.5)';
   ctx.lineWidth = 1;
 
-  // Door leaf line
   const leafAngle = angle + (Math.PI / 2) * swingDir;
   ctx.beginPath();
   ctx.moveTo(hinge[0], hinge[1]);
   ctx.lineTo(hinge[0] + Math.cos(leafAngle) * doorPx, hinge[1] + Math.sin(leafAngle) * doorPx);
   ctx.stroke();
 
-  // Arc
   const arcStart = swingDir > 0 ? angle : angle - Math.PI / 2;
   const arcEnd   = swingDir > 0 ? angle + Math.PI / 2 : angle;
   ctx.beginPath();
   ctx.arc(hinge[0], hinge[1], doorPx, arcStart, arcEnd, swingDir < 0);
   ctx.stroke();
 
-  // Width label
   const mx = (dpx + dpx2) / 2, my = (dpy + dpy2) / 2;
   dimTag(ctx, mx + Math.cos(angle + Math.PI / 2) * 12, my + Math.sin(angle + Math.PI / 2) * 12,
     `${d.width.toFixed(2)} m`, isDoorSel ? '#ff9944' : '#887055');
+}
+
+function drawFurniture(f) {
+  const sel = S.selectedId === `furniture-${f.id}`;
+  const [vw, vh] = furnDims(f);
+  const centerH = roofHeightAt(f.x + vw / 2, f.y + vh / 2);
+
+  let fillColor, borderColor;
+  if (centerH >= S.minH) {
+    fillColor  = sel ? 'rgba(74,158,255,0.22)'  : 'rgba(74,158,255,0.10)';
+    borderColor = sel ? '#4a9eff'               : 'rgba(74,158,255,0.55)';
+  } else if (centerH >= S.storageH) {
+    fillColor  = sel ? 'rgba(255,160,50,0.22)'  : 'rgba(255,160,50,0.10)';
+    borderColor = sel ? '#ffa030'               : 'rgba(255,160,50,0.6)';
+  } else {
+    fillColor  = sel ? 'rgba(210,55,55,0.22)'   : 'rgba(210,55,55,0.10)';
+    borderColor = sel ? '#d23737'               : 'rgba(210,55,55,0.6)';
+  }
+
+  const [cx1, cy1] = m2c(f.x, f.y);
+  const pw = vw * scale, ph = vh * scale;
+
+  ctx.fillStyle = fillColor;
+  ctx.fillRect(cx1, cy1, pw, ph);
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = sel ? 2 : 1.5;
+  ctx.strokeRect(cx1, cy1, pw, ph);
+
+  // Icon + dims label
+  const preset = FURNITURE[f.type] || {};
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = borderColor;
+  if (pw > 28 && ph > 18) {
+    ctx.font = '12px system-ui';
+    ctx.fillText(preset.icon || '?', cx1 + pw / 2, cy1 + ph / 2 - (ph > 28 ? 6 : 0));
+    if (ph > 28) {
+      ctx.font = '9px system-ui';
+      ctx.fillText(`${vw.toFixed(1)}×${vh.toFixed(1)}`, cx1 + pw / 2, cy1 + ph / 2 + 7);
+    }
+  }
+
+  // Corner resize handles when selected
+  if (sel) {
+    ctx.fillStyle = '#4a9eff';
+    for (const [hx, hy] of [[cx1, cy1], [cx1+pw, cy1], [cx1, cy1+ph], [cx1+pw, cy1+ph]]) {
+      ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  ctx.textBaseline = 'alphabetic';
 }
 
 function dimLabel(x, y, text, angle) {
@@ -775,18 +956,16 @@ function renderSection() {
   const dw = W - ml - mr, dh = H - mt - mb;
 
   const maxH = Math.max(S.ridgeH * 1.1, 3);
-  const ss = Math.min(dw / S.width, dh / maxH); // section scale
+  const ss = Math.min(dw / S.width, dh / maxH);
   const sox = ml + (dw - S.width * ss) / 2;
-  const soy = mt + dh;  // baseline (floor level)
+  const soy = mt + dh;
 
   function sc(x, h) { return [sox + x * ss, soy - h * ss]; }
 
-  // Floor baseline
   sctx.strokeStyle = '#333';
   sctx.lineWidth = 1;
   sctx.beginPath(); sctx.moveTo(sox, soy); sctx.lineTo(sox + S.width * ss, soy); sctx.stroke();
 
-  // Height gridlines + labels
   for (let h = 0.5; h <= maxH; h += 0.5) {
     const [, cy] = sc(0, h);
     if (cy < mt) break;
@@ -799,7 +978,6 @@ function renderSection() {
     sctx.fillText(h.toFixed(1), ml - 4, cy + 3);
   }
 
-  // Usable zone fill in section
   const [ux1, ux2] = usableZoneX();
   const [, minCY] = sc(0, S.minH);
   if (ux2 > ux1) {
@@ -807,23 +985,19 @@ function renderSection() {
     sctx.fillRect(sox + ux1 * ss, minCY, (ux2 - ux1) * ss, soy - minCY);
   }
 
-  // Storage zone fill in section
   const [sstx1, sstx2] = storageZoneX();
   const [, storageCY] = sc(0, S.storageH);
   if (sstx2 > sstx1) {
-    // Left storage band
     if (sstx1 < ux1) {
       sctx.fillStyle = 'rgba(180,120,255,0.07)';
       sctx.fillRect(sox + sstx1 * ss, storageCY, Math.min(ux1, sstx2) * ss - sstx1 * ss, soy - storageCY);
     }
-    // Right storage band
     if (sstx2 > ux2) {
       sctx.fillStyle = 'rgba(180,120,255,0.07)';
       sctx.fillRect(sox + Math.max(ux2, sstx1) * ss, storageCY, (sstx2 - Math.max(ux2, sstx1)) * ss, soy - storageCY);
     }
   }
 
-  // Storage threshold dashed line
   sctx.strokeStyle = 'rgba(180,120,255,0.3)';
   sctx.lineWidth = 1;
   sctx.setLineDash([3, 4]);
@@ -834,7 +1008,6 @@ function renderSection() {
   sctx.textAlign = 'left';
   sctx.fillText(`${S.storageH.toFixed(1)} m`, sox + S.width * ss + 3, storageCY + 3);
 
-  // Min-height dashed line
   sctx.strokeStyle = 'rgba(74,158,255,0.3)';
   sctx.lineWidth = 1;
   sctx.setLineDash([5, 4]);
@@ -845,7 +1018,6 @@ function renderSection() {
   sctx.textAlign = 'left';
   sctx.fillText(`${S.minH.toFixed(1)} m`, sox + S.width * ss + 3, minCY + 3);
 
-  // Roof polygon
   const rx = S.ridgePosX * S.width;
   const [rcx, rcy] = sc(rx, S.ridgeH);
   const [lx, ly] = sc(0, S.eavesH);
@@ -861,50 +1033,42 @@ function renderSection() {
   sctx.lineWidth = 1.5;
   sctx.beginPath(); sctx.moveTo(lx, ly); sctx.lineTo(rcx, rcy); sctx.lineTo(rrx, rry); sctx.stroke();
 
-  // Eaves walls
   sctx.strokeStyle = '#444';
   sctx.lineWidth = 1;
   [[lx, ly], [rrx, rry]].forEach(([ex, ey]) => {
     sctx.beginPath(); sctx.moveTo(ex, ey); sctx.lineTo(ex, soy); sctx.stroke();
   });
 
-  // Ridge height annotation
   sctx.fillStyle = '#666';
   sctx.font = '10px system-ui';
   sctx.textAlign = 'center';
   sctx.fillText(`▲ ${S.ridgeH.toFixed(1)} m`, rcx, rcy - 6);
 
-  // Eaves height annotation
   sctx.fillStyle = '#555';
   sctx.fillText(`${S.eavesH.toFixed(1)} m`, lx - 8, ly + 3);
 
-  // ── Dormers at current Y slice ──
+  // Dormers at current Y slice
   if (S.hoverYm !== null) {
     for (const d of S.dormers) {
       const [drx1, dry1, drx2, dry2] = dormerRect(d);
       if (S.hoverYm < dry1 || S.hoverYm > dry2) continue;
-      // Draw dormer box in section
       const [dcx1,] = sc(drx1, 0);
       const [dcx2,] = sc(drx2, 0);
       const [, dcTop] = sc(0, d.height);
-      sctx.fillStyle = 'rgba(255,140,30,0.12)';
+      sctx.fillStyle = 'rgba(74,158,255,0.12)';
       sctx.fillRect(dcx1, dcTop, dcx2 - dcx1, soy - dcTop);
-      sctx.strokeStyle = 'rgba(255,140,30,0.6)';
+      sctx.strokeStyle = 'rgba(74,158,255,0.6)';
       sctx.lineWidth = 1.5;
-      // Front wall (vertical from floor to dormer ceiling)
       sctx.beginPath(); sctx.moveTo(dcx1, soy); sctx.lineTo(dcx1, dcTop); sctx.stroke();
       sctx.beginPath(); sctx.moveTo(dcx2, soy); sctx.lineTo(dcx2, dcTop); sctx.stroke();
-      // Ceiling (flat)
       sctx.beginPath(); sctx.moveTo(dcx1, dcTop); sctx.lineTo(dcx2, dcTop); sctx.stroke();
-      // Dormer height label
-      sctx.fillStyle = 'rgba(255,160,50,0.7)';
+      sctx.fillStyle = 'rgba(74,158,255,0.7)';
       sctx.font = '9px system-ui';
       sctx.textAlign = 'center';
       sctx.fillText(`dormer ${d.height.toFixed(1)} m`, (dcx1+dcx2)/2, dcTop - 4);
     }
   }
 
-  // Hover position indicator
   if (S.hoverXm !== null) {
     const hx = Math.max(0, Math.min(S.width, S.hoverXm));
     const hh = roofHeightAt(hx, S.hoverYm ?? undefined);
@@ -942,18 +1106,88 @@ mainCanvas.addEventListener('mousemove', (e) => {
   S.hoverYm = my;
 
   if (S.dragging) {
-    const { wallId, doorId } = S.dragging;
-    const w = S.walls.find(x => x.id === wallId);
-    const d = w?.doors.find(x => x.id === doorId);
-    if (w && d) {
-      const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
-      const len = Math.hypot(dx, dy);
-      // Project mouse onto wall line
-      const t = ((mx - w.x1) * dx + (my - w.y1) * dy) / (len * len);
-      const hw = d.width / (2 * len);
-      d.pos = Math.max(hw, Math.min(1 - hw, t));
+    _dragMoved = true;
+    const dr = S.dragging;
+
+    if (dr.type === 'door') {
+      const w = S.walls.find(x => x.id === dr.wallId);
+      const d = w?.doors.find(x => x.id === dr.doorId);
+      if (w && d) {
+        const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+        const len = Math.hypot(dx, dy);
+        const t = ((mx - w.x1) * dx + (my - w.y1) * dy) / (len * len);
+        const hw = d.width / (2 * len);
+        d.pos = Math.max(hw, Math.min(1 - hw, t));
+      }
+    }
+
+    else if (dr.type === 'wall-endpoint') {
+      const w = S.walls.find(x => x.id === dr.wallId);
+      if (w) {
+        const [sx, sy] = snapPoint(mx, my);
+        if (dr.endpoint === 'start') { w.x1 = sx; w.y1 = sy; }
+        else { w.x2 = sx; w.y2 = sy; }
+      }
+    }
+
+    else if (dr.type === 'wall-body') {
+      const w = S.walls.find(x => x.id === dr.wallId);
+      if (w) {
+        const sdx = snap(mx - dr.startMx);
+        const sdy = snap(my - dr.startMy);
+        w.x1 = dr.ox1 + sdx; w.y1 = dr.oy1 + sdy;
+        w.x2 = dr.ox2 + sdx; w.y2 = dr.oy2 + sdy;
+      }
+    }
+
+    else if (dr.type === 'furniture-body') {
+      const f = S.furniture.find(x => x.id === dr.fid);
+      if (f) {
+        const [vw, vh] = furnDims(f);
+        f.x = snap(Math.max(0, Math.min(S.width  - vw, dr.ox + (mx - dr.startMx))));
+        f.y = snap(Math.max(0, Math.min(S.length - vh, dr.oy + (my - dr.startMy))));
+      }
+    }
+
+    else if (dr.type === 'furniture-handle') {
+      const f = S.furniture.find(x => x.id === dr.fid);
+      if (f) {
+        const minSize = 0.3;
+        const o = dr.orig;
+        const dmx = mx - dr.startMx;
+        const dmy = my - dr.startMy;
+        // All sizes stored as natural f.w/f.h; visual dims depend on rotation.
+        // Work entirely in visual space then convert back.
+        const rotated = f.rotation % 2 !== 0;
+        // orig visual dims
+        const ovw = rotated ? o.h : o.w;
+        const ovh = rotated ? o.w : o.h;
+
+        let nvw = ovw, nvh = ovh, nx = o.x, ny = o.y;
+        if (dr.handle === 'se') {
+          nvw = Math.max(minSize, snap(ovw + dmx));
+          nvh = Math.max(minSize, snap(ovh + dmy));
+        } else if (dr.handle === 'sw') {
+          nvw = Math.max(minSize, snap(ovw - dmx));
+          nx = snap(o.x + ovw - nvw);
+          nvh = Math.max(minSize, snap(ovh + dmy));
+        } else if (dr.handle === 'ne') {
+          nvw = Math.max(minSize, snap(ovw + dmx));
+          nvh = Math.max(minSize, snap(ovh - dmy));
+          ny = snap(o.y + ovh - nvh);
+        } else if (dr.handle === 'nw') {
+          nvw = Math.max(minSize, snap(ovw - dmx));
+          nvh = Math.max(minSize, snap(ovh - dmy));
+          nx = snap(o.x + ovw - nvw);
+          ny = snap(o.y + ovh - nvh);
+        }
+        f.x = nx; f.y = ny;
+        if (rotated) { f.w = nvh; f.h = nvw; }
+        else         { f.w = nvw; f.h = nvh; }
+      }
     }
   }
+
   render();
 });
 
@@ -966,19 +1200,73 @@ mainCanvas.addEventListener('mouseleave', () => {
 
 mainCanvas.addEventListener('mousedown', (e) => {
   if (S.mode !== 'select') return;
+  _dragMoved = false;
   const [mx, my] = getMetres(e);
 
-  // Check for door drag start
+  // 1. Door drag
   for (const w of S.walls) {
     for (const d of w.doors) {
       const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
       const len = Math.hypot(dx, dy);
       const doorX = w.x1 + dx * d.pos, doorY = w.y1 + dy * d.pos;
       if (Math.hypot(mx - doorX, my - doorY) < 0.4) {
-        S.dragging = { wallId: w.id, doorId: d.id };
+        S.dragging = { type: 'door', wallId: w.id, doorId: d.id };
         S.selectedId = `door-${w.id}-${d.id}`;
+        render();
         return;
       }
+    }
+  }
+
+  // 2. Wall endpoint drag
+  for (const w of S.walls) {
+    for (const [ep, ex, ey] of [['start', w.x1, w.y1], ['end', w.x2, w.y2]]) {
+      if (Math.hypot(mx - ex, my - ey) < 0.3) {
+        S.dragging = { type: 'wall-endpoint', wallId: w.id, endpoint: ep };
+        S.selectedId = w.id;
+        render();
+        return;
+      }
+    }
+  }
+
+  // 3. Furniture handle (only if furniture currently selected)
+  if (typeof S.selectedId === 'string' && S.selectedId.startsWith('furniture-')) {
+    const fid = parseInt(S.selectedId.split('-')[1]);
+    const f = S.furniture.find(x => x.id === fid);
+    if (f) {
+      const [vw, vh] = furnDims(f);
+      const corners = { nw: [f.x, f.y], ne: [f.x+vw, f.y], sw: [f.x, f.y+vh], se: [f.x+vw, f.y+vh] };
+      for (const [handle, [hx, hy]] of Object.entries(corners)) {
+        if (Math.hypot(mx - hx, my - hy) < 0.2) {
+          S.dragging = { type: 'furniture-handle', fid, handle,
+            orig: { x: f.x, y: f.y, w: f.w, h: f.h }, startMx: mx, startMy: my };
+          render();
+          return;
+        }
+      }
+    }
+  }
+
+  // 4. Wall body drag
+  for (const w of S.walls) {
+    if (distToSegment(mx, my, w.x1, w.y1, w.x2, w.y2) < 0.25) {
+      S.dragging = { type: 'wall-body', wallId: w.id,
+        ox1: w.x1, oy1: w.y1, ox2: w.x2, oy2: w.y2, startMx: mx, startMy: my };
+      S.selectedId = w.id;
+      render();
+      return;
+    }
+  }
+
+  // 5. Furniture body drag
+  for (const f of [...S.furniture].reverse()) {
+    const [vw, vh] = furnDims(f);
+    if (mx >= f.x && mx <= f.x + vw && my >= f.y && my <= f.y + vh) {
+      S.dragging = { type: 'furniture-body', fid: f.id, ox: f.x, oy: f.y, startMx: mx, startMy: my };
+      S.selectedId = `furniture-${f.id}`;
+      render();
+      return;
     }
   }
 });
@@ -988,7 +1276,10 @@ mainCanvas.addEventListener('mouseup', () => {
 });
 
 mainCanvas.addEventListener('click', (e) => {
-  if (S.dragging) return;
+  // Skip selection logic if this click ended a drag
+  if (_dragMoved) { _dragMoved = false; return; }
+  _dragMoved = false;
+
   const [mx, my] = getMetres(e);
   const [smx, smy] = snapPoint(mx, my);
 
@@ -1022,7 +1313,7 @@ mainCanvas.addEventListener('click', (e) => {
           id: newId(),
           x1: S.drawStart[0], y1: S.drawStart[1],
           x2: smx, y2: smy,
-          height: S.minH,  // match minimum usable standing height
+          height: S.minH,
         });
       }
       S.drawStart = null;
@@ -1031,7 +1322,16 @@ mainCanvas.addEventListener('click', (e) => {
     return;
   }
 
-  // Select mode — check dormers, then doors, then walls
+  if (S.mode === 'furniture') {
+    // Canvas clicks in furniture mode just deselect
+    S.selectedId = null;
+    render();
+    return;
+  }
+
+  // ── Select mode — hit test ──
+
+  // Dormers
   for (const d of S.dormers) {
     const [drx1, dry1, drx2, dry2] = dormerRect(d);
     if (mx >= drx1 && mx <= drx2 && my >= dry1 && my <= dry2) {
@@ -1041,6 +1341,17 @@ mainCanvas.addEventListener('click', (e) => {
     }
   }
 
+  // Furniture (reverse order — topmost first)
+  for (const f of [...S.furniture].reverse()) {
+    const [vw, vh] = furnDims(f);
+    if (mx >= f.x && mx <= f.x + vw && my >= f.y && my <= f.y + vh) {
+      S.selectedId = `furniture-${f.id}`;
+      render();
+      return;
+    }
+  }
+
+  // Doors
   for (const w of S.walls) {
     for (const d of w.doors) {
       const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
@@ -1054,6 +1365,7 @@ mainCanvas.addEventListener('click', (e) => {
     }
   }
 
+  // Walls
   let best = null, bestD = 0.25;
   for (const w of S.walls) {
     const d = distToSegment(mx, my, w.x1, w.y1, w.x2, w.y2);
@@ -1075,7 +1387,7 @@ function setMode(m) {
   S.mode = m;
   S.drawStart = null;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  const map = { select: 'btnSelect', wall: 'btnWall', dormer: 'btnDormer' };
+  const map = { select: 'btnSelect', wall: 'btnWall', dormer: 'btnDormer', furniture: 'btnFurniture' };
   if (map[m]) document.getElementById(map[m]).classList.add('active');
   render();
 }
@@ -1085,8 +1397,7 @@ function addDoor() {
   if (!w) return;
   const len = wallLen(w);
   if (len < 0.9) return;
-  const id = newId();
-  w.doors.push({ id, pos: 0.5, width: 0.9, swing: 1 });
+  w.doors.push({ id: newId(), pos: 0.5, width: 0.9, swing: 1 });
   render();
 }
 
@@ -1099,6 +1410,9 @@ function deleteSelected() {
   } else if (typeof S.selectedId === 'string' && S.selectedId.startsWith('dormer-')) {
     const id = parseInt(S.selectedId.split('-')[1]);
     S.dormers = S.dormers.filter(d => d.id !== id);
+  } else if (typeof S.selectedId === 'string' && S.selectedId.startsWith('furniture-')) {
+    const id = parseInt(S.selectedId.split('-')[1]);
+    S.furniture = S.furniture.filter(f => f.id !== id);
   } else {
     S.walls = S.walls.filter(w => w.id !== S.selectedId);
   }
@@ -1106,8 +1420,47 @@ function deleteSelected() {
   render();
 }
 
-function changeDormerHeight(delta) {
-  // No-op: dormer height tracks minH automatically
+function deleteDormer(id) {
+  S.dormers = S.dormers.filter(d => d.id !== id);
+  if (S.selectedId === `dormer-${id}`) S.selectedId = null;
+  render();
+}
+
+function resizeDormer(id, dim, val) {
+  const d = S.dormers.find(x => x.id === id);
+  if (!d) return;
+  const v = Math.max(0.25, parseFloat(val) || 0.25);
+  if (dim === 'w') {
+    d.x2 = d.x1 < d.x2 ? d.x1 + v : d.x1 - v;
+  } else {
+    d.y2 = d.y1 < d.y2 ? d.y1 + v : d.y1 - v;
+  }
+  render();
+}
+
+function addFurniture(type) {
+  const preset = FURNITURE[type];
+  if (!preset) return;
+  const id = newId();
+  const x = snap(Math.max(0, (S.width  - preset.w) / 2));
+  const y = snap(Math.max(0, (S.length - preset.h) / 2));
+  S.furniture.push({ id, type, x, y, w: preset.w, h: preset.h, rotation: 0 });
+  S.selectedId = `furniture-${id}`;
+  setMode('select');
+}
+
+function rotateFurniture() {
+  if (typeof S.selectedId !== 'string' || !S.selectedId.startsWith('furniture-')) return;
+  const id = parseInt(S.selectedId.split('-')[1]);
+  const f = S.furniture.find(x => x.id === id);
+  if (!f) return;
+  const [vw, vh] = furnDims(f);
+  const cx = f.x + vw / 2, cy = f.y + vh / 2;
+  f.rotation = (f.rotation + 1) % 4;
+  const [nvw, nvh] = furnDims(f);
+  f.x = snap(Math.max(0, cx - nvw / 2));
+  f.y = snap(Math.max(0, cy - nvh / 2));
+  render();
 }
 
 function flipDoorSwing() {
@@ -1147,7 +1500,15 @@ function updateInfo() {
   if (S.mode === 'dormer') {
     el.innerHTML = S.drawStart
       ? '<strong>Click</strong> to set opposite corner<br><strong>Right-click</strong> or <strong>Esc</strong> to cancel'
-      : '<strong>Click &amp; drag</strong> to draw a dormer area<br>Height defaults to ridge height<br><strong>S</strong> to switch to Select';
+      : '<strong>Click</strong> to place first corner, click again to finish<br>Raises ceiling to min standing height<br><strong>S</strong> to switch to Select';
+    return;
+  }
+
+  if (S.mode === 'furniture') {
+    const btns = Object.entries(FURNITURE).map(([type, {icon}]) =>
+      `<button class="furn-btn" onclick="addFurniture('${type}')">${icon} ${type}</button>`
+    ).join('');
+    el.innerHTML = `<div style="margin-bottom:6px;color:#777;font-size:11px;">Click to place:</div><div class="furniture-palette">${btns}</div>`;
     return;
   }
 
@@ -1160,9 +1521,10 @@ function updateInfo() {
         <div style="color:#555">at ≥ ${S.minH.toFixed(1)} m height</div>
       </div>
       <div style="color:#555;font-size:11px;">
-        <strong style="color:#888">W</strong> — draw walls<br>
-        <strong style="color:#888">D</strong> — draw dormer<br>
-        Click a wall, door or dormer to select<br>
+        <strong style="color:#888">W</strong> — draw walls &nbsp;
+        <strong style="color:#888">D</strong> — dormers<br>
+        <strong style="color:#888">F</strong> — furniture mode<br>
+        Click to select · <strong style="color:#888">R</strong> rotate furniture<br>
         <strong style="color:#888">Esc</strong> — deselect
       </div>`;
     return;
@@ -1179,9 +1541,31 @@ function updateInfo() {
         <div>Dormer selected</div>
         <div>Width: <strong>${(drx2-drx1).toFixed(2)} m</strong></div>
         <div>Depth: <strong>${(dry2-dry1).toFixed(2)} m</strong></div>
-        <div>Ceiling height: <strong>${S.minH.toFixed(2)} m</strong> <span style="color:#555;font-size:10px;">(tracks min standing height)</span></div>
+        <div>Ceiling height: <strong>${S.minH.toFixed(2)} m</strong>
+          <span style="color:#555;font-size:10px;">(tracks min standing height)</span></div>
       </div>
       <button class="action-btn danger" onclick="deleteSelected()">✕ Delete Dormer</button>`;
+    return;
+  }
+
+  // Furniture selected
+  if (typeof S.selectedId === 'string' && S.selectedId.startsWith('furniture-')) {
+    const id = parseInt(S.selectedId.split('-')[1]);
+    const f = S.furniture.find(x => x.id === id);
+    if (!f) return;
+    const [vw, vh] = furnDims(f);
+    const centerH = roofHeightAt(f.x + vw / 2, f.y + vh / 2);
+    const hColor = centerH >= S.minH ? '#4a9eff' : centerH >= S.storageH ? '#ffa030' : '#d23737';
+    const hLabel = centerH >= S.minH ? '✓ OK' : centerH >= S.storageH ? '⚠ Low' : '✗ Too low';
+    el.innerHTML = `
+      <div style="margin-bottom:8px;">
+        <div><strong>${f.type}</strong> — ${vw.toFixed(1)} × ${vh.toFixed(1)} m</div>
+        <div>Height at centre: <strong style="color:${hColor}">${centerH.toFixed(2)} m</strong>
+          <span style="color:${hColor};font-size:10px;">${hLabel}</span></div>
+        <div style="color:#555;font-size:11px;margin-top:3px;">Drag to move · drag corner to resize</div>
+      </div>
+      <button class="action-btn" onclick="rotateFurniture()">↻ Rotate 90° <span style="color:#555;font-size:10px;">(R)</span></button>
+      <button class="action-btn danger" onclick="deleteSelected()">✕ Delete</button>`;
     return;
   }
 
@@ -1193,6 +1577,7 @@ function updateInfo() {
       <div style="margin-bottom:8px;">
         <div>Wall: <strong>${wallLen(w).toFixed(2)} m</strong></div>
         <div>Doors: ${w.doors.length}</div>
+        <div style="color:#555;font-size:11px;margin-top:3px;">Drag endpoint handles to resize<br>Drag body to move</div>
       </div>
       <button class="action-btn" onclick="addDoor()">+ Add Door (0.9 m)</button>
       <button class="action-btn danger" onclick="deleteSelected()">✕ Delete Wall</button>`;
@@ -1200,7 +1585,7 @@ function updateInfo() {
   }
 
   // Door selected
-  if (typeof S.selectedId === 'string') {
+  if (typeof S.selectedId === 'string' && S.selectedId.startsWith('door-')) {
     const [, wid, did] = S.selectedId.split('-').map(Number);
     const w = S.walls.find(x => x.id === wid);
     const d = w?.doors.find(x => x.id === did);
@@ -1268,6 +1653,12 @@ document.addEventListener('keydown', (e) => {
     case 's': case 'S':
       setMode('select');
       break;
+    case 'f': case 'F':
+      setMode('furniture');
+      break;
+    case 'r': case 'R':
+      rotateFurniture();
+      break;
   }
 });
 
@@ -1282,7 +1673,8 @@ function saveToURL() {
       id: w.id, x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2,
       doors: w.doors.map(d => ({ id: d.id, pos: d.pos, width: d.width, swing: d.swing }))
     })),
-    dormers: S.dormers.map(d => ({ id: d.id, x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2, height: d.height }))
+    dormers: S.dormers.map(d => ({ id: d.id, x1: d.x1, y1: d.y1, x2: d.x2, y2: d.y2, height: d.height })),
+    furniture: S.furniture.map(f => ({ id: f.id, type: f.type, x: f.x, y: f.y, w: f.w, h: f.h, rotation: f.rotation })),
   };
   const encoded = btoa(JSON.stringify(data));
   history.replaceState(null, '', '#' + encoded);
@@ -1293,22 +1685,23 @@ function loadFromURL() {
   if (!hash) return false;
   try {
     const data = JSON.parse(atob(hash));
-    S.width    = data.w  ?? S.width;
-    S.length   = data.l  ?? S.length;
-    S.ridgeH   = data.rh ?? S.ridgeH;
-    S.eavesH   = data.eh ?? S.eavesH;
+    S.width     = data.w  ?? S.width;
+    S.length    = data.l  ?? S.length;
+    S.ridgeH    = data.rh ?? S.ridgeH;
+    S.eavesH    = data.eh ?? S.eavesH;
     S.ridgePosX = data.rp ?? S.ridgePosX;
-    S.minH     = data.mh ?? S.minH;
-    S.storageH = data.sh ?? S.storageH;
-    S.walls    = data.walls ?? [];
-    S.dormers  = data.dormers ?? [];
-    // Restore nextId above any existing IDs
+    S.minH      = data.mh ?? S.minH;
+    S.storageH  = data.sh ?? S.storageH;
+    S.walls     = data.walls   ?? [];
+    S.dormers   = data.dormers ?? [];
+    S.furniture = (data.furniture ?? []).map(f => ({ ...f, rotation: f.rotation ?? 0 }));
     let maxId = 0;
     for (const w of S.walls) {
       maxId = Math.max(maxId, w.id);
       for (const d of w.doors) maxId = Math.max(maxId, d.id);
     }
-    for (const d of S.dormers) maxId = Math.max(maxId, d.id);
+    for (const d of S.dormers)  maxId = Math.max(maxId, d.id);
+    for (const f of S.furniture) maxId = Math.max(maxId, f.id);
     S._nextId = maxId + 1;
     syncControls();
     return true;
@@ -1316,22 +1709,22 @@ function loadFromURL() {
 }
 
 function syncControls() {
-  document.getElementById('ctrlWidth').value  = S.width;
-  document.getElementById('ctrlLength').value = S.length;
-  document.getElementById('ctrlRidgeH').value = S.ridgeH;
-  document.getElementById('ctrlEavesH').value = S.eavesH;
+  document.getElementById('ctrlWidth').value    = S.width;
+  document.getElementById('ctrlLength').value   = S.length;
+  document.getElementById('ctrlRidgeH').value   = S.ridgeH;
+  document.getElementById('ctrlEavesH').value   = S.eavesH;
   document.getElementById('ctrlMinH').value     = S.minH;
   document.getElementById('ctrlStorageH').value = S.storageH;
   const pct = Math.round(S.ridgePosX * 100);
   document.getElementById('ctrlRidgePos').value = pct;
 
-  document.getElementById('widthVal').textContent  = `${S.width.toFixed(1)} m`;
-  document.getElementById('lengthVal').textContent = `${S.length.toFixed(1)} m`;
-  document.getElementById('ridgeHVal').textContent = `${S.ridgeH.toFixed(1)} m`;
-  document.getElementById('eavesHVal').textContent = `${S.eavesH.toFixed(1)} m`;
+  document.getElementById('widthVal').textContent     = `${S.width.toFixed(1)} m`;
+  document.getElementById('lengthVal').textContent    = `${S.length.toFixed(1)} m`;
+  document.getElementById('ridgeHVal').textContent    = `${S.ridgeH.toFixed(1)} m`;
+  document.getElementById('eavesHVal').textContent    = `${S.eavesH.toFixed(1)} m`;
   document.getElementById('minHVal').textContent      = `${S.minH.toFixed(1)} m`;
-  document.getElementById('storageHVal').textContent = `${S.storageH.toFixed(1)} m`;
-  document.getElementById('ridgePosVal').textContent =
+  document.getElementById('storageHVal').textContent  = `${S.storageH.toFixed(1)} m`;
+  document.getElementById('ridgePosVal').textContent  =
     pct === 50 ? 'Centre' : `${pct}% from left`;
 }
 
